@@ -1,0 +1,9 @@
+{
+	"name": "tomowa",
+	"private": true,
+	"workspaces": [
+		"apps/*",
+		"infrastructure/*",
+		"packages/*"
+	]
+}
