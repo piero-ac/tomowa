@@ -1,13 +1,17 @@
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
+import healthRouter from "./routes/heath.routes.js";
+import sessionsRouter from "./routes/session.routes.js";
+import meRouter from "./routes/me.routes.js";
+import { notFoundHandler } from "./middleware/not-found.js";
+import { errorHandler } from "./middleware/error-handler.js";
 export const app = express();
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
-app.get("/health", (_req, res) => {
-    res.status(200).json({
-        status: "ok",
-        service: "tomowa-api",
-    });
-});
+app.use("/health", healthRouter);
+app.use("/sessions", sessionsRouter);
+app.use("/me", meRouter);
+app.use(notFoundHandler);
+app.use(errorHandler);
