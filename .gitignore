@@ -8,6 +8,9 @@ out/
 # Logs
 *.log
 
+# Build output
+dist/
+
 # Environment
 .env
 .env.local
