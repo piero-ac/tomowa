@@ -1,9 +1,34 @@
+import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { sessions } from "../db/schema.js";
 import type { CreateSessionInput } from "../services/sessions.service.js";
 
 export async function getSessions() {
-	return db.select().from(sessions);
+	return db
+		.select({
+			id: sessions.id,
+			organizerId: sessions.organizerId,
+			title: sessions.title,
+			targetLanguage: sessions.targetLanguage,
+			helpLanguage: sessions.helpLanguage,
+			startsAt: sessions.startsAt,
+			capacity: sessions.capacity,
+			imageKey: sessions.imageKey,
+			description: sessions.description,
+			createdAt: sessions.createdAt,
+			updatedAt: sessions.updatedAt,
+		})
+		.from(sessions);
+}
+
+export async function getSessionById(sessionId: string) {
+	const [session] = await db
+		.select()
+		.from(sessions)
+		.where(eq(sessions.id, sessionId))
+		.limit(1);
+
+	return session ?? null;
 }
 
 export async function createSession(input: CreateSessionInput) {
