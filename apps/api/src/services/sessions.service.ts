@@ -7,7 +7,26 @@ export type CreateSessionInput = CreateSessionBody & {
 };
 
 export async function getSessions() {
-	return sessionRepository.getSessions();
+	const sessions = await sessionRepository.getSessions();
+	return sessions.map(({ id, ...session }) => ({
+		sessionId: id,
+		...session,
+	}));
+}
+
+export async function getSessionById(sessionId: string) {
+	const session = await sessionRepository.getSessionById(sessionId);
+
+	if (!session) {
+		throw new Error("Session not found.");
+	}
+
+	// TODO: Hide meetingLink based on attendee and organizer id check
+	const { id, ...sessionData } = session;
+	return {
+		sessionId: id,
+		...sessionData,
+	};
 }
 
 export async function createSession(input: CreateSessionInput) {

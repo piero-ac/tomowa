@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+export const sessionIdSchema = z.object({
+	sessionId: z.uuid(),
+});
+
 export const createSessionSchema = z.object({
 	title: z.string().trim().min(1, "Title is required").max(100),
 	targetLanguage: z.string().trim().min(1, "Target language is required"),

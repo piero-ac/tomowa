@@ -1,5 +1,8 @@
 import { type Request, type Response } from "express";
-import { createSessionSchema } from "../validation/session.schema.js";
+import {
+	createSessionSchema,
+	sessionIdSchema,
+} from "../validation/session.schema.js";
 import { z } from "zod";
 import * as sessionService from "../services/sessions.service.js";
 
@@ -9,6 +12,21 @@ export async function getSessions(req: Request, res: Response) {
 	const sessions = await sessionService.getSessions();
 
 	res.status(200).json(sessions);
+}
+
+export async function getSessionById(req: Request, res: Response) {
+	const result = sessionIdSchema.safeParse(req.params);
+
+	if (!result.success) {
+		res.status(400).json({
+			message: "Invalid session ID",
+		});
+		return;
+	}
+
+	const session = await sessionService.getSessionById(result.data.sessionId);
+
+	res.status(200).json(session);
 }
 
 export async function createSession(req: Request, res: Response) {
