@@ -55,24 +55,14 @@ req.user.id;
 interface Session {
 	sessionId: string;
 	organizerId: string;
-
 	title: string;
-
 	targetLanguage: string;
 	helpLanguage: string;
-
-	difficulty: "Beginner" | "Intermediate" | "Advanced" | "All";
-
 	startsAt: string;
-
 	capacity: number;
-
 	attendeeCount: number;
-
 	meetingLink: string;
-
 	description?: string;
-
 	createdAt: string;
 	updatedAt: string;
 }

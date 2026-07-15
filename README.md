@@ -1,16 +1,16 @@
 # Tomowa
 
-Tomowa is a serverless language exchange session platform.
+Tomowa is a language exchange session platform.
 
 ## Stack
 
 - Next.js
 - TypeScript
-- AWS Lambda
-- API Gateway
-- Amazon Cognito
-- Amazon DynamoDB
-- AWS CDK
+- Express
+- Drizzle ORM
+- Supabase Auth
+- Supabase PostgresSQL
+- Amazon S3
 
 ## Status
 
