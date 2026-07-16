@@ -2,6 +2,7 @@ import { type Request, type Response } from "express";
 import {
 	createSessionSchema,
 	sessionIdSchema,
+	updateSessionSchema,
 } from "../validation/session.schema.js";
 import { z } from "zod";
 import * as sessionService from "../services/sessions.service.js";
@@ -47,4 +48,34 @@ export async function createSession(req: Request, res: Response) {
 	});
 
 	res.status(201).json(createdSession);
+}
+
+export async function updateSession(req: Request, res: Response) {
+	const paramsResult = sessionIdSchema.safeParse(req.params);
+
+	if (!paramsResult.success) {
+		res.status(400).json({
+			message: "Invalid session ID",
+		});
+		return;
+	}
+
+	const bodyResult = updateSessionSchema.safeParse(req.body);
+
+	if (!bodyResult.success) {
+		const errors = z.flattenError(bodyResult.error);
+
+		res.status(400).json({
+			message: "Validation failed",
+			errors,
+		});
+		return;
+	}
+
+	const updatedSession = await sessionService.updateSession(
+		paramsResult.data.sessionId,
+		bodyResult.data,
+	);
+
+	res.status(200).json(updatedSession);
 }
