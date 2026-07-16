@@ -20,4 +20,11 @@ export const createSessionSchema = z.object({
 	description: z.string().trim().min(1, "Description is required").max(1000),
 });
 
+export const updateSessionSchema = createSessionSchema
+	.partial()
+	.refine((data) => Object.keys(data).length > 0, {
+		message: "At least one field must be provided",
+	});
+
 export type CreateSessionBody = z.infer<typeof createSessionSchema>;
+export type UpdateSessionBody = z.infer<typeof updateSessionSchema>;

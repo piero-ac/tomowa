@@ -1,7 +1,10 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { sessions } from "../db/schema.js";
-import type { CreateSessionInput } from "../services/sessions.service.js";
+import type {
+	CreateSessionInput,
+	UpdateSessionInput,
+} from "../types/session.js";
 
 export async function getSessions() {
 	return db
@@ -38,4 +41,20 @@ export async function createSession(input: CreateSessionInput) {
 		.returning({ sessionId: sessions.id });
 
 	return createdSession;
+}
+
+export async function updateSession(
+	sessionId: string,
+	input: UpdateSessionInput,
+) {
+	const [updatedSession] = await db
+		.update(sessions)
+		.set({
+			...input,
+			updatedAt: new Date(),
+		})
+		.where(eq(sessions.id, sessionId))
+		.returning();
+
+	return updatedSession ?? null;
 }
