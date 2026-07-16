@@ -1,6 +1,9 @@
 import * as sessionRepository from "../repositories/sessions.repository.js";
 
-import type { CreateSessionBody } from "../validation/session.schema.js";
+import type {
+	CreateSessionBody,
+	UpdateSessionBody,
+} from "../validation/session.schema.js";
 
 export type CreateSessionInput = CreateSessionBody & {
 	organizerId: string;
@@ -35,4 +38,36 @@ export async function createSession(input: CreateSessionInput) {
 	}
 
 	return sessionRepository.createSession(input);
+}
+
+export async function updateSession(
+	sessionId: string,
+	input: UpdateSessionBody,
+) {
+	const existingSession = await sessionRepository.getSessionById(sessionId);
+
+	if (!existingSession) {
+		throw new Error("Session not found.");
+	}
+
+	if (input.startsAt && input.startsAt <= new Date()) {
+		throw new Error("Session must start in the future.");
+	}
+
+	const updatedSession = await sessionRepository.updateSession(
+		sessionId,
+		input,
+	);
+
+	if (!updatedSession) {
+		throw new Error("Session could not be updated.");
+	}
+
+	// TODO: Hide meetingLink based on organizer/selected partner authorization.
+	const { id, ...sessionData } = updatedSession;
+
+	return {
+		sessionId: id,
+		...sessionData,
+	};
 }
