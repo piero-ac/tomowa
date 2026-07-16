@@ -1,10 +1,28 @@
-import type {
-	CreateSessionBody,
-	UpdateSessionBody,
-} from "../validation/session.schema.js";
+import type { InsertSession } from "../db/schema.js";
 
-export type CreateSessionInput = CreateSessionBody & {
-	organizerId: string;
-};
+export type CreateSessionInput = Pick<
+	InsertSession,
+	| "organizerId"
+	| "title"
+	| "targetLanguage"
+	| "helpLanguage"
+	| "startsAt"
+	| "capacity"
+	| "meetingLink"
+	| "imageKey"
+	| "description"
+>;
 
-export type UpdateSessionInput = UpdateSessionBody;
+export type UpdateSessionInput = Partial<
+	Pick<
+		InsertSession,
+		| "title"
+		| "targetLanguage"
+		| "helpLanguage"
+		| "startsAt"
+		| "capacity"
+		| "meetingLink"
+		| "imageKey"
+		| "description"
+	>
+>;
