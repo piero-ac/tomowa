@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { sessions } from "../db/schema.js";
 import type {
@@ -57,4 +57,17 @@ export async function updateSession(
 		.returning();
 
 	return updatedSession ?? null;
+}
+
+export async function deleteSession(sessionId: string, organizerId: string) {
+	const [deletedSession] = await db
+		.delete(sessions)
+		.where(
+			and(eq(sessions.id, sessionId), eq(sessions.organizerId, organizerId)),
+		)
+		.returning({
+			sessionId: sessions.id,
+		});
+
+	return deletedSession ?? null;
 }
