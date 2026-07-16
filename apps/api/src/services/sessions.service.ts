@@ -1,13 +1,8 @@
 import * as sessionRepository from "../repositories/sessions.repository.js";
-
 import type {
-	CreateSessionBody,
-	UpdateSessionBody,
-} from "../validation/session.schema.js";
-
-export type CreateSessionInput = CreateSessionBody & {
-	organizerId: string;
-};
+	CreateSessionInput,
+	UpdateSessionInput,
+} from "../types/session.js";
 
 export async function getSessions() {
 	const sessions = await sessionRepository.getSessions();
@@ -42,7 +37,7 @@ export async function createSession(input: CreateSessionInput) {
 
 export async function updateSession(
 	sessionId: string,
-	input: UpdateSessionBody,
+	input: UpdateSessionInput,
 ) {
 	const existingSession = await sessionRepository.getSessionById(sessionId);
 
