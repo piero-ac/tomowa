@@ -79,3 +79,24 @@ export async function updateSession(req: Request, res: Response) {
 
 	res.status(200).json(updatedSession);
 }
+
+export async function deleteSession(req: Request, res: Response) {
+	const paramsResult = sessionIdSchema.safeParse(req.params);
+
+	if (!paramsResult.success) {
+		res.status(400).json({
+			message: "Invalid session ID",
+		});
+		return;
+	}
+
+	// TODO: get organizerId from user object in req object
+	//  const organizerId = req.user.id;
+
+	await sessionService.deleteSession(
+		paramsResult.data.sessionId,
+		TEMPORARY_ORGANIZER_ID,
+	);
+
+	res.status(204).send();
+}
