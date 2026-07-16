@@ -7,5 +7,6 @@ router.get("/", sessionController.getSessions);
 router.get("/:sessionId", sessionController.getSessionById);
 router.post("/", sessionController.createSession);
 router.patch("/:sessionId", sessionController.updateSession);
+router.delete("/:sessionId", sessionController.deleteSession);
 
 export default router;
