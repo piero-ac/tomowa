@@ -66,3 +66,24 @@ export async function updateSession(
 		...sessionData,
 	};
 }
+
+export async function deleteSession(sessionId: string, organizerId: string) {
+	const existingSession = await sessionRepository.getSessionById(sessionId);
+
+	if (!existingSession) {
+		throw new Error("Session not found.");
+	}
+
+	if (existingSession.organizerId !== organizerId) {
+		throw new Error("Deletion not allowed");
+	}
+
+	const deletedSession = await sessionRepository.deleteSession(
+		sessionId,
+		organizerId,
+	);
+
+	if (!deletedSession) {
+		throw new Error("Session could not be deleted.");
+	}
+}
