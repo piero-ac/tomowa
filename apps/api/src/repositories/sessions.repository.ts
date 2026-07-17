@@ -40,7 +40,7 @@ export async function createSession(input: CreateSessionInput) {
 		.values(input)
 		.returning({ sessionId: sessions.id });
 
-	return createdSession;
+	return createdSession ?? null;
 }
 
 export async function updateSession(
