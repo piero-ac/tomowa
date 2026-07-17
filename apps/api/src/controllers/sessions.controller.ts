@@ -6,6 +6,7 @@ import {
 } from "../validation/session.schema.js";
 import { z } from "zod";
 import * as sessionService from "../services/sessions.service.js";
+import { BadRequestError } from "../errors/index.js";
 
 const TEMPORARY_ORGANIZER_ID = "11111111-1111-1111-1111-111111111111";
 
@@ -19,10 +20,10 @@ export async function getSessionById(req: Request, res: Response) {
 	const result = sessionIdSchema.safeParse(req.params);
 
 	if (!result.success) {
-		res.status(400).json({
-			message: "Invalid session ID",
-		});
-		return;
+		throw new BadRequestError(
+			"Validation failed.",
+			z.flattenError(result.error),
+		);
 	}
 
 	const session = await sessionService.getSessionById(result.data.sessionId);
@@ -34,12 +35,10 @@ export async function createSession(req: Request, res: Response) {
 	const result = createSessionSchema.safeParse(req.body);
 
 	if (!result.success) {
-		res.status(400).json({
-			message: "Validation failed",
-			errors: z.flattenError(result.error),
-		});
-
-		return;
+		throw new BadRequestError(
+			"Validation failed.",
+			z.flattenError(result.error),
+		);
 	}
 
 	const createdSession = await sessionService.createSession({
@@ -54,22 +53,20 @@ export async function updateSession(req: Request, res: Response) {
 	const paramsResult = sessionIdSchema.safeParse(req.params);
 
 	if (!paramsResult.success) {
-		res.status(400).json({
-			message: "Invalid session ID",
-		});
-		return;
+		throw new BadRequestError(
+			"Invalid session ID.",
+			z.flattenError(paramsResult.error),
+		);
 	}
 
 	const bodyResult = updateSessionSchema.safeParse(req.body);
 
 	if (!bodyResult.success) {
 		const errors = z.flattenError(bodyResult.error);
-
-		res.status(400).json({
-			message: "Validation failed",
+		throw new BadRequestError(
+			"Validation failed.",
 			errors,
-		});
-		return;
+		);
 	}
 
 	const updatedSession = await sessionService.updateSession(
@@ -84,10 +81,10 @@ export async function deleteSession(req: Request, res: Response) {
 	const paramsResult = sessionIdSchema.safeParse(req.params);
 
 	if (!paramsResult.success) {
-		res.status(400).json({
-			message: "Invalid session ID",
-		});
-		return;
+		throw new BadRequestError(
+			"Invalid session ID.",
+			z.flattenError(paramsResult.error),
+		);
 	}
 
 	// TODO: get organizerId from user object in req object
