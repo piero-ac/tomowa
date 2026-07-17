@@ -1,11 +1,10 @@
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
+import { NotFoundError } from "../errors/index.js";
 
 export function notFoundHandler(
-	req: Request,
-	res: Response,
-	next: NextFunction,
+   req: Request,
+   res: Response,
+   next: NextFunction,
 ) {
-	res.status(404).json({
-		message: "Route not found",
-	});
+   next(new NotFoundError("Route not found."));
 }
