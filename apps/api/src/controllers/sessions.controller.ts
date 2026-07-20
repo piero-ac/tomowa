@@ -6,9 +6,8 @@ import {
 } from "../validation/session.schema.js";
 import { z } from "zod";
 import * as sessionService from "../services/sessions.service.js";
-import { BadRequestError } from "../errors/index.js";
+import { BadRequestError, UnauthorizedError } from "../errors/index.js";
 
-const TEMPORARY_ORGANIZER_ID = "11111111-1111-1111-1111-111111111111";
 
 export async function getSessions(req: Request, res: Response) {
 	const sessions = await sessionService.getSessions();
@@ -32,6 +31,10 @@ export async function getSessionById(req: Request, res: Response) {
 }
 
 export async function createSession(req: Request, res: Response) {
+	if (!req.user) {
+		throw new UnauthorizedError();
+	}
+
 	const result = createSessionSchema.safeParse(req.body);
 
 	if (!result.success) {
@@ -43,13 +46,17 @@ export async function createSession(req: Request, res: Response) {
 
 	const createdSession = await sessionService.createSession({
 		...result.data,
-		organizerId: TEMPORARY_ORGANIZER_ID,
+		organizerId: req.user.id,
 	});
 
 	res.status(201).json(createdSession);
 }
 
 export async function updateSession(req: Request, res: Response) {
+	if (!req.user) {
+		throw new UnauthorizedError();
+	}
+
 	const paramsResult = sessionIdSchema.safeParse(req.params);
 
 	if (!paramsResult.success) {
@@ -71,6 +78,7 @@ export async function updateSession(req: Request, res: Response) {
 
 	const updatedSession = await sessionService.updateSession(
 		paramsResult.data.sessionId,
+		req.user.id,
 		bodyResult.data,
 	);
 
@@ -78,6 +86,10 @@ export async function updateSession(req: Request, res: Response) {
 }
 
 export async function deleteSession(req: Request, res: Response) {
+	if (!req.user) {
+		throw new UnauthorizedError();
+	}
+
 	const paramsResult = sessionIdSchema.safeParse(req.params);
 
 	if (!paramsResult.success) {
@@ -87,12 +99,9 @@ export async function deleteSession(req: Request, res: Response) {
 		);
 	}
 
-	// TODO: get organizerId from user object in req object
-	//  const organizerId = req.user.id;
-
 	await sessionService.deleteSession(
 		paramsResult.data.sessionId,
-		TEMPORARY_ORGANIZER_ID,
+		req.user.id,
 	);
 
 	res.status(204).send();
