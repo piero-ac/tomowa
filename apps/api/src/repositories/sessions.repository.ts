@@ -45,6 +45,7 @@ export async function createSession(input: CreateSessionInput) {
 
 export async function updateSession(
 	sessionId: string,
+	organizerId: string,
 	input: UpdateSessionInput,
 ) {
 	const [updatedSession] = await db
@@ -53,7 +54,10 @@ export async function updateSession(
 			...input,
 			updatedAt: new Date(),
 		})
-		.where(eq(sessions.id, sessionId))
+		.where(and(
+			eq(sessions.id, sessionId),
+			eq(sessions.organizerId, organizerId),
+		),)
 		.returning();
 
 	return updatedSession ?? null;

@@ -8,6 +8,7 @@ import meRouter from "./routes/me.routes.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { logErrors } from "./middleware/log-errors.js";
 import { notFoundHandler } from "./middleware/not-found.js";
+import { requireAuth } from "./middleware/require-auth.js";
 
 export const app = express();
 
@@ -16,8 +17,8 @@ app.use(cors());
 app.use(express.json({ limit: "100kb" }));
 
 app.use("/health", healthRouter);
-app.use("/sessions", sessionsRouter);
-app.use("/me", meRouter);
+app.use("/sessions", requireAuth, sessionsRouter);
+app.use("/me", requireAuth, meRouter);
 
 app.use(notFoundHandler);
 app.use(logErrors);

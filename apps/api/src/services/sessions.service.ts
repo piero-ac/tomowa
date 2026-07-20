@@ -48,6 +48,7 @@ export async function createSession(input: CreateSessionInput) {
 
 export async function updateSession(
 	sessionId: string,
+	organizerId: string,
 	input: UpdateSessionInput,
 ) {
 	const existingSession = await sessionRepository.getSessionById(sessionId);
@@ -56,12 +57,17 @@ export async function updateSession(
 		throw new NotFoundError("Session not found.");
 	}
 
+	if (existingSession.organizerId !== organizerId) {
+		throw new ForbiddenError("Update not allowed.");
+	}
+
 	if (input.startsAt && input.startsAt <= new Date()) {
 		throw new BadRequestError("Session must start in the future.");
 	}
 
 	const updatedSession = await sessionRepository.updateSession(
 		sessionId,
+		organizerId,
 		input,
 	);
 
