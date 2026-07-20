@@ -2,49 +2,15 @@
 
 ## Purpose
 
-This document defines the PostgreSQL database design for Tomowa.
+This document defines the target MVP PostgreSQL design for Tomowa's one-to-one
+language-practice scheduling workflow.
 
 The schema is derived from:
 
 - `docs/api.md`
 - `docs/access-patterns.md`
 
-Tomowa uses:
-
-```text
-Express
-    ↓
-Drizzle ORM
-    ↓
-Supabase PostgreSQL
-```
-
-Supabase is used as the PostgreSQL host and authentication provider.
-
-The Express API owns:
-
-- Business logic
-- Authorization
-- Database access
-- Session management
-- S3 upload coordination
-
-The frontend must not query application tables directly.
-
----
-
-# Database Ownership
-
-Tomowa uses Supabase for:
-
-```text
-Supabase Auth
-Supabase-hosted PostgreSQL
-```
-
-Tomowa does not use the Supabase Data API for application database access.
-
-Application data flows through:
+## Architecture and ownership
 
 ```text
 Next.js
@@ -53,612 +19,387 @@ Express API
     ↓
 Drizzle ORM
     ↓
-PostgreSQL
+Supabase PostgreSQL
 ```
 
-The Drizzle schema is the source of truth for application tables.
+Supabase provides PostgreSQL and Auth. The frontend does not query application
+tables directly; Express owns business logic, authorization, and application
+database access.
 
-Drizzle Kit is used to generate and apply migrations.
+Drizzle is the application-schema and migration source of truth:
 
----
+- Tables, columns, indexes, and supported constraints are declared in the
+  Drizzle schema.
+- Drizzle Kit generates and applies migrations.
+- PostgreSQL functions, triggers, partial indexes, or other features that need
+  custom SQL are committed in the same Drizzle migration history.
+- Schema changes are not made manually in the hosted Supabase dashboard.
+- The Supabase CLI may run the local services, but it is not a second migration
+  owner. Run Drizzle migrations against the local Supabase database after the
+  local stack starts.
 
-# Core Tables
+## Core tables
 
-The MVP requires two application tables:
+The target MVP requires:
 
-1. `sessions`
-2. `session_attendees`
+1. `profiles`
+2. `sessions`
+3. `session_requests`
 
-A future S3 upload flow will store the S3 object key on the `sessions` table.
+There is no `session_attendees` table. The single approved request identifies
+the session's practice partner.
 
----
+## Profiles
 
-# Sessions Table
+`profiles` stores application-facing user data. Its primary key matches the
+Supabase Auth user ID.
 
-The `sessions` table represents an online language exchange session.
+| Column | Type | Nullable | Description |
+| --- | --- | ---: | --- |
+| `id` | `uuid` | No | PK and FK to `auth.users.id` |
+| `display_name` | `text` | Yes | Public display name |
+| `username` | `text` | Yes | Optional unique handle |
+| `bio` | `text` | Yes | Short public biography |
+| `avatar_key` | `text` | Yes | Object-storage key, not a temporary URL |
+| `native_language` | `text` | Yes | Language the user can help with |
+| `learning_language` | `text` | Yes | Language the user is practicing |
+| `timezone` | `text` | Yes | IANA timezone for display and input |
+| `created_at` | `timestamptz` | No | Creation timestamp |
+| `updated_at` | `timestamptz` | No | Last application update |
 
-## Columns
-
-| Column            | PostgreSQL Type | Nullable | Description                                |
-| ----------------- | --------------- | -------: | ------------------------------------------ |
-| `id`              | `uuid`          |       No | Primary key                                |
-| `organizer_id`    | `uuid`          |       No | Supabase Auth user ID of the organizer     |
-| `title`           | `text`          |       No | Session title                              |
-| `target_language` | `text`          |       No | Language participants want to practice     |
-| `help_language`   | `text`          |       No | Language participants can use for support  |
-| `starts_at`       | `timestamptz`   |       No | Scheduled start time                       |
-| `capacity`        | `integer`       |       No | Maximum number of attendees                |
-| `meeting_link`    | `text`          |       No | Private external meeting URL               |
-| `image_key`       | `text`          |      Yes | S3 object key for the optional cover image |
-| `description`     | `text`          |       No | Session details                            |
-| `created_at`      | `timestamptz`   |       No | Creation timestamp                         |
-| `updated_at`      | `timestamptz`   |       No | Last update timestamp                      |
-
-## Drizzle Schema
-
-```ts
-import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-
-export const sessions = pgTable("sessions", {
-	id: uuid("id").defaultRandom().primaryKey(),
-
-	organizerId: uuid("organizer_id").notNull(),
-
-	title: text("title").notNull(),
-
-	targetLanguage: text("target_language").notNull(),
-
-	helpLanguage: text("help_language").notNull(),
-
-	startsAt: timestamp("starts_at", {
-		withTimezone: true,
-	}).notNull(),
-
-	capacity: integer("capacity").notNull(),
-
-	meetingLink: text("meeting_link").notNull(),
-
-	imageKey: text("image_key"),
-
-	description: text("description").notNull(),
-
-	createdAt: timestamp("created_at", {
-		withTimezone: true,
-	})
-		.defaultNow()
-		.notNull(),
-
-	updatedAt: timestamp("updated_at", {
-		withTimezone: true,
-	})
-		.defaultNow()
-		.notNull(),
-});
-
-export type InsertSession = typeof sessions.$inferInsert;
-export type SelectSession = typeof sessions.$inferSelect;
-```
-
----
-
-# Organizer Identity
-
-`organizer_id` stores the authenticated Supabase Auth user ID.
-
-It is intentionally not defined as a foreign key to:
+Relationship:
 
 ```text
-auth.users.id
+profiles.id → auth.users.id ON DELETE CASCADE
 ```
 
-## Reason
+Application tables reference `profiles.id`, avoiding repeated direct coupling
+to the Auth schema while retaining referential integrity.
 
-Supabase Auth is an external identity system from the perspective of the application domain.
+### Profile provisioning trigger
 
-The Express authentication middleware verifies the Supabase JWT and extracts the authenticated user ID.
+An `AFTER INSERT` trigger on `auth.users` inserts the corresponding profile.
 
-The backend then assigns:
+Requirements:
+
+- Function is `SECURITY DEFINER`.
+- Function has an explicit safe `search_path` and schema-qualified names.
+- `profiles.id` is set from `NEW.id`.
+- Optional metadata is copied defensively.
+- Missing metadata does not fail signup.
+- The migration includes both forward creation and any rollback behavior
+  required by the migration framework.
+
+The table remains defined in Drizzle. The trigger and function are tracked as
+custom SQL in a Drizzle-owned migration.
+
+## Session status
+
+Allowed values:
 
 ```text
-organizerId = authenticatedUser.id
+open
+booked
+completed
+cancelled
 ```
 
-The client must never provide a trusted organizer ID directly.
+Use either a PostgreSQL enum declared through Drizzle or a text column with a
+database check constraint. The application also validates transitions.
 
-Avoiding a foreign key to `auth.users` keeps the application schema less coupled to Supabase Auth and makes a future authentication-provider migration easier.
+## Sessions
 
----
+Each row represents one available one-to-one practice time.
 
-# Session Attendees Table
+| Column | Type | Nullable | Description |
+| --- | --- | ---: | --- |
+| `id` | `uuid` | No | Primary key |
+| `owner_id` | `uuid` | No | FK to `profiles.id` |
+| `title` | `text` | No | Session title |
+| `target_language` | `text` | No | Language being practiced |
+| `help_language` | `text` | No | Shared/support language |
+| `starts_at` | `timestamptz` | No | Scheduled start time in UTC |
+| `duration_minutes` | `integer` | No | Session duration |
+| `status` | enum/text | No | Defaults to `open` |
+| `meeting_link` | `text` | No | Private meeting URL |
+| `image_key` | `text` | Yes | Optional object-storage key |
+| `description` | `text` | No | Session details |
+| `created_at` | `timestamptz` | No | Creation timestamp |
+| `updated_at` | `timestamptz` | No | Last update timestamp |
 
-The `session_attendees` table represents users who have joined sessions.
+Changes from the current implementation:
 
-It should be added when RSVP functionality is implemented.
+- Rename `organizer_id` to `owner_id`.
+- Remove `capacity`; sessions are always one-to-one.
+- Add `duration_minutes`.
+- Add lifecycle `status`.
+- Add a foreign key from `owner_id` to `profiles.id`.
 
-## Columns
-
-| Column       | PostgreSQL Type | Nullable | Description           |
-| ------------ | --------------- | -------: | --------------------- |
-| `session_id` | `uuid`          |       No | Session being joined  |
-| `user_id`    | `uuid`          |       No | Supabase Auth user ID |
-| `joined_at`  | `timestamptz`   |       No | Time the user joined  |
-
-## Primary Key
-
-Use a composite primary key:
+Recommended relationships:
 
 ```text
-(session_id, user_id)
+sessions.owner_id → profiles.id
 ```
 
-This guarantees that the same user cannot join one session more than once.
+Choose the `ON DELETE` behavior deliberately. For the MVP, `RESTRICT` is safer
+than silently deleting historical sessions when a profile is removed. User
+deletion should go through an application/admin workflow that first handles
+owned records.
 
-## Foreign Key
+## Session request status
+
+Allowed values:
 
 ```text
-session_attendees.session_id
+pending
+approved
+declined
+cancelled
+```
+
+## Session requests
+
+Each row records one user's request and its decision history.
+
+| Column | Type | Nullable | Description |
+| --- | --- | ---: | --- |
+| `id` | `uuid` | No | Primary key |
+| `session_id` | `uuid` | No | FK to `sessions.id` |
+| `requester_id` | `uuid` | No | FK to `profiles.id` |
+| `status` | enum/text | No | Defaults to `pending` |
+| `message` | `text` | Yes | Optional request note |
+| `created_at` | `timestamptz` | No | Request creation time |
+| `responded_at` | `timestamptz` | Yes | Owner decision time |
+| `updated_at` | `timestamptz` | No | Last state change |
+
+Relationships:
+
+```text
+session_requests.session_id → sessions.id ON DELETE CASCADE
+session_requests.requester_id → profiles.id
+```
+
+Use `RESTRICT` for requester profile deletion until an explicit account-deletion
+and anonymization policy is designed.
+
+## Relationships
+
+```text
+auth.users
+    1
     ↓
-sessions.id
-```
+    1
+profiles
+    1 ──────────────── many sessions (owned)
+    1 ──────────────── many session_requests (submitted)
 
-Use:
-
-```text
-ON DELETE CASCADE
-```
-
-When a session is deleted, its attendee records should be deleted automatically.
-
-## Planned Drizzle Schema
-
-```ts
-import { primaryKey, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
-
-export const sessionAttendees = pgTable(
-	"session_attendees",
-	{
-		sessionId: uuid("session_id")
-			.notNull()
-			.references(() => sessions.id, {
-				onDelete: "cascade",
-			}),
-
-		userId: uuid("user_id").notNull(),
-
-		joinedAt: timestamp("joined_at", {
-			withTimezone: true,
-		})
-			.defaultNow()
-			.notNull(),
-	},
-	(table) => [
-		primaryKey({
-			columns: [table.sessionId, table.userId],
-		}),
-	],
-);
-```
-
-The precise Drizzle syntax should be verified against the installed Drizzle version when this table is implemented.
-
----
-
-# Relationships
-
-```text
 sessions
-──────────────────────────
-id PK
-organizer_id
-title
-starts_at
-capacity
-...
-
-       1
-       │
-       │
-       ▼
-       many
-
-session_attendees
-──────────────────────────
-session_id PK, FK
-user_id PK
-joined_at
+    1
+    ↓
+    many session_requests
+        └── at most one approved row
 ```
 
-A session can have many attendees.
+## Constraints
 
-A user can attend many sessions.
+PostgreSQL protects structural integrity even if a future code path bypasses a
+service-layer check.
 
-This forms a many-to-many relationship between authenticated users and sessions, represented by `session_attendees`.
+Required constraints:
 
----
+```text
+profiles.id PRIMARY KEY
+profiles.id FOREIGN KEY → auth.users.id ON DELETE CASCADE
 
-# Attendee Count
+sessions.id PRIMARY KEY
+sessions.owner_id FOREIGN KEY → profiles.id
+sessions.duration_minutes > 0
 
-The MVP should not store a separate `attendee_count` column initially.
+session_requests.id PRIMARY KEY
+session_requests.session_id FOREIGN KEY → sessions.id ON DELETE CASCADE
+session_requests.requester_id FOREIGN KEY → profiles.id
+```
 
-The current attendee count can be derived from:
+### Exactly one approved requester
+
+Use a partial unique index:
 
 ```sql
-SELECT COUNT(*)
-FROM session_attendees
-WHERE session_id = $1;
+CREATE UNIQUE INDEX session_requests_one_approved_idx
+ON session_requests (session_id)
+WHERE status = 'approved';
 ```
 
-## Reason
+This is the final concurrency guard when two approval attempts race.
 
-Storing an attendee count would duplicate information and require every join and leave operation to update both:
+### Duplicate active requests
 
-```text
-session_attendees
-sessions.attendee_count
-```
-
-Deriving the count avoids synchronization bugs.
-
-If performance later becomes a real concern, a cached attendee count can be introduced through a migration.
-
----
-
-# Meeting Link Privacy
-
-The meeting link is stored on the `sessions` row:
-
-```text
-sessions.meeting_link
-```
-
-It must not be returned automatically in every API response.
-
-The Express service layer determines whether the authenticated user may see it.
-
-The user may view the meeting link when:
-
-```text
-user.id === session.organizerId
-```
-
-or when a matching attendee record exists:
-
-```text
-session_attendees.session_id = session.id
-AND
-session_attendees.user_id = user.id
-```
-
-The repository may retrieve the full session row, but the service must create a safe response object that omits `meetingLink` for unauthorized viewers.
-
----
-
-# Session Image Storage
-
-Session cover images are stored in Amazon S3.
-
-PostgreSQL stores only the object key:
-
-```text
-session-images/<userId>/<uuid>.<extension>
-```
-
-Example:
-
-```text
-session-images/7bc58d22-7c01-4f72-a08d-09be8b24d723/6d9f38be.webp
-```
-
-The database must not store:
-
-- Image bytes
-- Temporary presigned URLs
-- AWS credentials
-
-The `image_key` column is nullable because session images are optional.
-
-## Upload Flow
-
-```text
-Frontend
-    ↓
-Request presigned upload URL from Express
-    ↓
-Express validates file metadata and ownership
-    ↓
-Express generates short-lived S3 upload URL
-    ↓
-Frontend uploads directly to S3
-    ↓
-Session record stores the resulting object key
-```
-
-The MVP supports only one optional image per session.
-
----
-
-# Indexes
-
-Indexes should support actual API queries rather than being added speculatively.
-
-## Upcoming Sessions
-
-Used by:
-
-```text
-GET /api/sessions
-```
-
-Query shape:
+Prevent more than one active request from the same user for the same session:
 
 ```sql
-SELECT *
+CREATE UNIQUE INDEX session_requests_one_active_per_user_idx
+ON session_requests (session_id, requester_id)
+WHERE status IN ('pending', 'approved');
+```
+
+Declined or cancelled history does not prevent a future request if the session
+becomes open again.
+
+The rule that an owner cannot request their own session depends on another
+table's value and belongs in the transactional service logic.
+
+## Indexes
+
+### Browse open sessions
+
+Query:
+
+```sql
+SELECT ...
 FROM sessions
-WHERE starts_at >= NOW()
-ORDER BY starts_at ASC;
+WHERE status = 'open'
+  AND starts_at >= NOW()
+ORDER BY starts_at ASC, id ASC;
 ```
 
-Recommended index:
+Index:
 
 ```text
-sessions(starts_at)
+sessions(status, starts_at, id)
 ```
 
----
-
-## Sessions Created by User
-
-Used by:
+### Sessions owned by one user
 
 ```text
-GET /api/me/sessions-created
+sessions(owner_id, starts_at, id)
 ```
 
-Query shape:
-
-```sql
-SELECT *
-FROM sessions
-WHERE organizer_id = $1
-ORDER BY starts_at ASC;
-```
-
-Recommended composite index:
+### Requests for a session
 
 ```text
-sessions(organizer_id, starts_at)
+session_requests(session_id, status, created_at)
 ```
 
-This index can support both filtering by organizer and ordering by start time.
-
----
-
-## Sessions Joined by User
-
-Used by:
+### Requests made by one user
 
 ```text
-GET /api/me/sessions-joined
+session_requests(requester_id, created_at)
 ```
 
-Query shape:
+## Approval transaction
 
-```sql
-SELECT s.*
-FROM session_attendees sa
-JOIN sessions s
-  ON s.id = sa.session_id
-WHERE sa.user_id = $1
-ORDER BY s.starts_at ASC;
-```
-
-Recommended index:
-
-```text
-session_attendees(user_id)
-```
-
-The composite primary key already supports lookups beginning with `session_id`.
-
-The additional `user_id` index supports finding every session joined by one user.
-
----
-
-# Constraints
-
-PostgreSQL should enforce structural data integrity where practical.
-
-## Required Constraints
-
-```text
-sessions.id
-    PRIMARY KEY
-
-session_attendees(session_id, user_id)
-    PRIMARY KEY
-
-session_attendees.session_id
-    FOREIGN KEY → sessions.id
-    ON DELETE CASCADE
-```
-
-## Capacity Validation
-
-At minimum, the service layer should reject:
-
-```text
-capacity <= 0
-```
-
-A PostgreSQL check constraint may also be added:
-
-```sql
-CHECK (capacity > 0)
-```
-
-Using both application validation and a database constraint is reasonable because the database constraint protects integrity even if a future code path bypasses the service.
-
----
-
-# Join Session Transaction
-
-Joining a session involves multiple checks that must remain consistent.
-
-The operation should execute inside a PostgreSQL transaction.
-
-## Required Rules
-
-- Session must exist.
-- Organizer cannot join their own session.
-- User cannot join twice.
-- Attendee count must remain below capacity.
-
-## Conceptual Flow
+Approving a request is atomic:
 
 ```text
 BEGIN
 
-Lock or safely read the session
-Count current attendees
-Verify capacity remains
-Verify user is not organizer
-Insert session_attendees row
+Lock session row
+Verify caller is owner
+Verify session status is open and starts in the future
+Lock and verify selected pending request
+Approve selected request and set responded_at
+Decline all other pending requests and set responded_at
+Set session status to booked
+Refresh updated_at values
 
 COMMIT
 ```
 
-The composite primary key prevents duplicate joins at the database level.
+The partial unique index prevents two approved rows even under concurrency. A
+uniqueness conflict maps to an application `409 Conflict`.
 
-Concurrency handling for capacity should be designed carefully when the RSVP feature is implemented.
+## Cancellation transactions
 
----
+### Requester cancels a pending request
 
-# Leave Session
+Update only that request to `cancelled` after checking ownership and state.
 
-Leaving a session deletes one row from `session_attendees`.
+### Approved requester cancels
 
-Conceptual query:
-
-```sql
-DELETE FROM session_attendees
-WHERE session_id = $1
-  AND user_id = $2;
-```
-
-If no row is deleted, the service should return an appropriate conflict or not-found response.
-
-The organizer is not represented as an attendee and therefore cannot leave their own session.
-
----
-
-# Update Session
-
-Only the organizer may update a session.
-
-The service must verify:
+In one transaction:
 
 ```text
-session.organizerId === authenticatedUserId
+approved request → cancelled
+booked future session → open
 ```
 
-The update repository method must explicitly refresh:
+Previously declined requests remain historical. New requests may be created.
+
+### Owner cancels the session
+
+In one transaction:
 
 ```text
-updated_at
+session → cancelled
+pending or approved requests → cancelled
 ```
 
-The `.defaultNow()` definition only supplies the initial value during insertion. It does not update the timestamp automatically.
+## Meeting-link privacy
 
-When capacity changes, the service must ensure:
+The meeting link is stored on `sessions.meeting_link` but omitted from general
+queries and response DTOs.
+
+It may be returned only when:
 
 ```text
-new capacity >= current attendee count
-```
-
----
-
-# Delete Session
-
-Only the organizer may delete a session.
-
-Deleting the session should automatically remove associated attendee records through:
-
-```text
-ON DELETE CASCADE
-```
-
-The associated S3 image object is not deleted automatically by PostgreSQL.
-
-The service should eventually coordinate:
-
-```text
-Delete database session
-Delete associated S3 object when imageKey exists
-```
-
-For MVP implementation, database correctness comes first. S3 cleanup should be added with the image feature.
-
----
-
-# Pagination
-
-The first implementation may use a simple limit.
-
-Future pagination should prefer cursor-based pagination using:
-
-```text
-starts_at
-id
-```
-
-Example ordering:
-
-```sql
-ORDER BY starts_at ASC, id ASC
-```
-
-Using the UUID as a secondary value provides stable ordering when multiple sessions share the same start time.
-
-Offset pagination is acceptable for the earliest MVP version but is less suitable as the dataset grows.
-
----
-
-# Migrations
-
-Drizzle Kit owns application schema migrations.
-
-Workflow:
-
-```text
-Edit src/db/schema.ts
-    ↓
-Generate migration
-    ↓
-Inspect generated SQL
-    ↓
-Apply migration
-    ↓
-Commit schema and migration files
-```
-
-Commands:
-
-```bash
-npm run db:generate
-npm run db:migrate
+viewer.id = sessions.owner_id
 ```
 
 or:
 
-```bash
-npx drizzle-kit generate
-npx drizzle-kit migrate
+```text
+session_requests.session_id = sessions.id
+AND session_requests.requester_id = viewer.id
+AND session_requests.status = approved
 ```
 
-Run database commands from:
+Do not include `meeting_link` in the repository projection used by the public
+session listing.
+
+## Time handling
+
+- Store `starts_at` as `timestamptz`.
+- Interpret API timestamps as ISO 8601 values with offsets.
+- Store a user's preferred IANA timezone on `profiles` for display and input.
+- Store duration explicitly rather than relying on a product-wide constant.
+- Cursor pagination uses `(starts_at, id)` for stable ordering.
+
+The MVP does not prevent owners or requesters from creating overlapping
+sessions. That rule can be added once product behavior is validated.
+
+## Image storage
+
+Profile avatars and optional session images store object keys, not image bytes,
+credentials, or temporary presigned URLs.
+
+Possible key shapes:
 
 ```text
-apps/api
+profile-images/<userId>/<uuid>.<extension>
+session-images/<userId>/<uuid>.<extension>
+```
+
+Object cleanup is an application workflow and is not performed automatically by
+PostgreSQL foreign keys.
+
+## Migration workflow
+
+Run commands from `apps/api`:
+
+```text
+Edit src/db/schema.ts
+    ↓
+npm run db:generate
+    ↓
+Inspect generated SQL and metadata
+    ↓
+Add reviewed custom SQL when needed
+    ↓
+Apply to local Supabase with npm run db:migrate
+    ↓
+Reset/recreate locally and verify
+    ↓
+Commit schema plus migration artifacts
 ```
 
 Commit:
@@ -666,49 +407,16 @@ Commit:
 ```text
 src/db/schema.ts
 drizzle.config.ts
-generated migration files
-migration metadata
+Drizzle-generated SQL
+Drizzle migration metadata and snapshots
+custom trigger/function/index SQL in migration history
 ```
 
-Do not commit:
+Do not use manual hosted-dashboard edits as schema history. Do not alternate
+between Drizzle Kit and Supabase CLI migration runners without an explicit
+integration design; they maintain different migration histories.
 
-```text
-.env
-dist/
-node_modules/
-```
-
----
-
-# Environment Configuration
-
-The API database connection is configured through:
-
-```env
-DATABASE_URL=
-```
-
-The value belongs in:
-
-```text
-apps/api/.env
-```
-
-The real `.env` file must not be committed.
-
-A safe template should be committed as:
-
-```text
-apps/api/.env.example
-```
-
----
-
-# Repository Responsibilities
-
-Database queries belong in the repository layer.
-
-Example request flow:
+## Repository and service responsibilities
 
 ```text
 Route
@@ -719,75 +427,43 @@ Service
     ↓
 Repository
     ↓
-Drizzle ORM
-    ↓
-Supabase PostgreSQL
+Drizzle/PostgreSQL
 ```
 
-Repositories may know about:
+Repositories own queries, joins, row locking, and transactions. They do not
+depend on Express request or response objects.
 
-- Drizzle
-- SQL queries
-- Tables
-- Joins
-- Transactions
+Services own state-transition rules and authorization decisions. Sensitive
+mutations should also constrain SQL by the authenticated user ID where
+practical.
 
-Repositories must not know about:
+## Current implementation gap
 
-- Express request objects
-- HTTP status codes
-- Response objects
-- Authentication middleware
-
-Business authorization remains in the service layer.
-
----
-
-# Initial Implementation Status
-
-Currently implemented:
+The current code and initial migration still model group sessions with:
 
 ```text
-sessions table
-Initial Drizzle migration
-Supabase PostgreSQL connection
-GET /sessions database query
+organizer_id
+capacity
+no profile foreign key
+no session status
 ```
 
-Planned next:
+The next schema work must migrate that implementation toward this document:
 
-```text
-POST /sessions
-Session validation
-Session attendee table
-Join and leave operations
-Authentication integration
-S3 session images
-```
+1. Add `profiles` and the Auth provisioning trigger.
+2. Replace session capacity with duration and status.
+3. Rename organizer ownership consistently if `owner_id` is adopted.
+4. Add `session_requests`, indexes, and constraints.
+5. Implement transactional request approval and cancellation.
 
----
+## Final design summary
 
-# Final Design Summary
-
-Tomowa uses a conventional relational design:
-
-```text
-sessions
-    1
-    ↓
-    many
-session_attendees
-```
-
-Key decisions:
-
-- Supabase hosts PostgreSQL and provides authentication.
-- Express owns database access and authorization.
-- Drizzle defines the schema and executes queries.
-- Drizzle Kit manages migrations.
-- Auth user IDs are stored as UUID values without foreign keys to `auth.users`.
-- Attendee records reference sessions with `ON DELETE CASCADE`.
-- Meeting links are protected in the service layer.
-- S3 object keys are stored in PostgreSQL.
-- Attendee count is derived rather than duplicated.
-- Transactions will protect session-capacity rules.
+- Supabase provides Auth and PostgreSQL.
+- Express verifies identity and owns application authorization.
+- Drizzle is the sole application migration authority.
+- Profiles mirror Supabase Auth identities through a provisioning trigger.
+- Sessions represent individual one-to-one time slots.
+- Multiple users may request a session, but only one request may be approved.
+- Transactions and partial unique indexes protect approval concurrency.
+- Request history is retained.
+- Meeting links are visible only to the owner and approved requester.
