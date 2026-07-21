@@ -9,12 +9,11 @@ export const createSessionSchema = z.object({
 	targetLanguage: z.string().trim().min(1, "Target language is required"),
 	helpLanguage: z.string().trim().min(1, "Help language is required"),
 	startsAt: z.iso.datetime().transform((value) => new Date(value)),
-	capacity: z
+	durationMinutes: z
 		.number()
-		.int("Capacity must be an integer")
-		.min(2, "Capacity must be at least 2")
-		.max(20, "Capacity cannot exceed 20"),
-
+		.int("Duration must be an integer")
+		.min(15, "Duration must be at least 15 minutes")
+		.max(120, "Duration cannot exceed 120 minutes"),
 	meetingLink: z.url("Meeting link must be a valid URL"),
 	imageKey: z.string().nullable().optional(),
 	description: z.string().trim().min(1, "Description is required").max(1000),

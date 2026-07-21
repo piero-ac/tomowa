@@ -2,12 +2,12 @@ import type { InsertSession } from "../db/schema.js";
 
 export type CreateSessionInput = Pick<
 	InsertSession,
-	| "organizerId"
+	| "ownerId"
 	| "title"
 	| "targetLanguage"
 	| "helpLanguage"
 	| "startsAt"
-	| "capacity"
+	| "durationMinutes"
 	| "meetingLink"
 	| "imageKey"
 	| "description"
@@ -20,7 +20,7 @@ export type UpdateSessionInput = Partial<
 		| "targetLanguage"
 		| "helpLanguage"
 		| "startsAt"
-		| "capacity"
+		| "durationMinutes"
 		| "meetingLink"
 		| "imageKey"
 		| "description"
