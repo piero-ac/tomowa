@@ -14,19 +14,28 @@
 		"db:studio": "drizzle-kit studio",
 		"supabase:start": "supabase start",
 		"supabase:stop": "supabase stop",
-		"supabase:status": "supabase status"
+		"supabase:status": "supabase status",
+		"lint": "eslint src drizzle.config.ts",
+		"lint:fix": "eslint src drizzle.config.ts --fix",
+		"format": "prettier --write \"src/**/*.ts\" \"drizzle.config.ts\" \"package.json\"",
+		"format:check": "prettier --check \"src/**/*.ts\" \"drizzle.config.ts\" \"package.json\""
 	},
 	"keywords": [],
 	"author": "",
 	"license": "ISC",
 	"type": "module",
 	"devDependencies": {
+		"@eslint/js": "^9.39.4",
 		"@types/cors": "^2.8.19",
 		"@types/express": "^5.0.6",
 		"@types/node": "^20.19.43",
 		"drizzle-kit": "^1.0.0-rc.4",
+		"eslint": "^9.39.4",
+		"eslint-config-prettier": "^10.1.8",
+		"prettier": "3.9.6",
 		"tsx": "^4.23.0",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"typescript-eslint": "^8.65.0"
 	},
 	"dependencies": {
 		"@supabase/supabase-js": "^2.110.7",

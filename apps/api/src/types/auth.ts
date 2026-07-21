@@ -1,3 +1,3 @@
-export type AuthenticatedUser = {
-   id: string;
-};
+export interface AuthenticatedUser {
+	id: string;
+}

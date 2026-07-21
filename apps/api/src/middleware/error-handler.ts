@@ -1,6 +1,4 @@
-import type {
-	ErrorRequestHandler,
-} from "express";
+import type { ErrorRequestHandler } from "express";
 import { AppError } from "../errors/AppError.js";
 
 type RequestBodyError = Error & {
@@ -8,13 +6,7 @@ type RequestBodyError = Error & {
 	type?: string;
 };
 
-export const errorHandler: ErrorRequestHandler = (
-	error,
-	req,
-	res,
-	next,
-) => {
-
+export const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
 	if (res.headersSent) {
 		next(error);
 		return;
