@@ -48,7 +48,7 @@ export async function createSession(input: CreateSessionInput) {
 
 export async function updateSession(
 	sessionId: string,
-	organizerId: string,
+	ownerId: string,
 	input: UpdateSessionInput,
 ) {
 	const existingSession = await sessionRepository.getSessionById(sessionId);
@@ -57,7 +57,7 @@ export async function updateSession(
 		throw new NotFoundError("Session not found.");
 	}
 
-	if (existingSession.organizerId !== organizerId) {
+	if (existingSession.ownerId !== ownerId) {
 		throw new ForbiddenError("Update not allowed.");
 	}
 
@@ -67,7 +67,7 @@ export async function updateSession(
 
 	const updatedSession = await sessionRepository.updateSession(
 		sessionId,
-		organizerId,
+		ownerId,
 		input,
 	);
 
@@ -75,7 +75,7 @@ export async function updateSession(
 		throw new Error("Session could not be updated.");
 	}
 
-	// TODO: Hide meetingLink based on organizer/selected partner authorization.
+	// TODO: Hide meetingLink based on owner/selected partner authorization.
 	const { id, ...sessionData } = updatedSession;
 
 	return {
@@ -84,20 +84,20 @@ export async function updateSession(
 	};
 }
 
-export async function deleteSession(sessionId: string, organizerId: string) {
+export async function deleteSession(sessionId: string, ownerId: string) {
 	const existingSession = await sessionRepository.getSessionById(sessionId);
 
 	if (!existingSession) {
 		throw new NotFoundError("Session not found.");
 	}
 
-	if (existingSession.organizerId !== organizerId) {
+	if (existingSession.ownerId !== ownerId) {
 		throw new ForbiddenError("Deletion not allowed.");
 	}
 
 	const deletedSession = await sessionRepository.deleteSession(
 		sessionId,
-		organizerId,
+		ownerId,
 	);
 
 	if (!deletedSession) {

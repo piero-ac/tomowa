@@ -10,12 +10,13 @@ export async function getSessions() {
 	return db
 		.select({
 			id: sessions.id,
-			organizerId: sessions.organizerId,
+			ownerId: sessions.ownerId,
 			title: sessions.title,
 			targetLanguage: sessions.targetLanguage,
 			helpLanguage: sessions.helpLanguage,
 			startsAt: sessions.startsAt,
-			capacity: sessions.capacity,
+			durationMinutes: sessions.durationMinutes,
+			status: sessions.status,
 			imageKey: sessions.imageKey,
 			description: sessions.description,
 			createdAt: sessions.createdAt,
@@ -45,7 +46,7 @@ export async function createSession(input: CreateSessionInput) {
 
 export async function updateSession(
 	sessionId: string,
-	organizerId: string,
+	ownerId: string,
 	input: UpdateSessionInput,
 ) {
 	const [updatedSession] = await db
@@ -54,21 +55,16 @@ export async function updateSession(
 			...input,
 			updatedAt: new Date(),
 		})
-		.where(and(
-			eq(sessions.id, sessionId),
-			eq(sessions.organizerId, organizerId),
-		),)
+		.where(and(eq(sessions.id, sessionId), eq(sessions.ownerId, ownerId)))
 		.returning();
 
 	return updatedSession ?? null;
 }
 
-export async function deleteSession(sessionId: string, organizerId: string) {
+export async function deleteSession(sessionId: string, ownerId: string) {
 	const [deletedSession] = await db
 		.delete(sessions)
-		.where(
-			and(eq(sessions.id, sessionId), eq(sessions.organizerId, organizerId)),
-		)
+		.where(and(eq(sessions.id, sessionId), eq(sessions.ownerId, ownerId)))
 		.returning({
 			sessionId: sessions.id,
 		});

@@ -8,7 +8,6 @@ import { z } from "zod";
 import * as sessionService from "../services/sessions.service.js";
 import { BadRequestError, UnauthorizedError } from "../errors/index.js";
 
-
 export async function getSessions(req: Request, res: Response) {
 	const sessions = await sessionService.getSessions();
 
@@ -46,7 +45,7 @@ export async function createSession(req: Request, res: Response) {
 
 	const createdSession = await sessionService.createSession({
 		...result.data,
-		organizerId: req.user.id,
+		ownerId: req.user.id,
 	});
 
 	res.status(201).json(createdSession);
@@ -70,10 +69,7 @@ export async function updateSession(req: Request, res: Response) {
 
 	if (!bodyResult.success) {
 		const errors = z.flattenError(bodyResult.error);
-		throw new BadRequestError(
-			"Validation failed.",
-			errors,
-		);
+		throw new BadRequestError("Validation failed.", errors);
 	}
 
 	const updatedSession = await sessionService.updateSession(
@@ -99,10 +95,7 @@ export async function deleteSession(req: Request, res: Response) {
 		);
 	}
 
-	await sessionService.deleteSession(
-		paramsResult.data.sessionId,
-		req.user.id,
-	);
+	await sessionService.deleteSession(paramsResult.data.sessionId, req.user.id);
 
 	res.status(204).send();
 }
