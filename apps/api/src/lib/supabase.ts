@@ -1,9 +1,9 @@
-// src/lib/supabase.ts
 import { createClient } from "@supabase/supabase-js";
+import { env } from "../config/env.js";
 
 export const supabase = createClient(
-   process.env.SUPABASE_URL!,
-   process.env.SUPABASE_PUBLISHABLE_KEY!,
+   env.SUPABASE_URL,
+   env.SUPABASE_PUBLISHABLE_KEY,
    {
       auth: {
          persistSession: false,

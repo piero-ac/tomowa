@@ -1,7 +1,7 @@
-import "dotenv/config";
+import { env } from "./config/env.js";
 import { app } from "./app.js";
 
-const port = Number(process.env.PORT ?? 3001);
+const port = env.PORT;
 
 const server = app.listen(port, () => {
 	console.log(`Tomowa API listening on port ${port}`);
