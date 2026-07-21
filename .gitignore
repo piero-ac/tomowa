@@ -24,3 +24,7 @@ dist/
 
 # CDK
 cdk.out/
+
+# Supabase local state
+**/supabase/.temp/
+**/supabase/.branches/
