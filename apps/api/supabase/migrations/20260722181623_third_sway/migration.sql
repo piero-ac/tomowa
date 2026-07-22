@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "sessions_owner_active_start_unique_idx" ON "sessions" ("owner_id","starts_at") WHERE "status" IN ('open', 'booked');
