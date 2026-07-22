@@ -74,27 +74,46 @@ export async function updateSession(
 		throw new ForbiddenError("Update not allowed.");
 	}
 
+	if (
+		existingSession.status === "cancelled" ||
+		existingSession.status === "completed"
+	) {
+		throw new ConflictError(
+			"Cancelled or completed sessions cannot be updated.",
+		);
+	}
+
+	if (existingSession.status === "booked" && input.startsAt !== undefined) {
+		throw new ConflictError("A booked session's start time cannot be changed.");
+	}
+
 	if (input.startsAt && input.startsAt <= new Date()) {
 		throw new BadRequestError("Session must start in the future.");
 	}
 
-	const updatedSession = await sessionRepository.updateSession(
-		sessionId,
-		ownerId,
-		input,
-	);
+	try {
+		const updatedSession = await sessionRepository.updateSession(
+			sessionId,
+			ownerId,
+			input,
+		);
 
-	if (!updatedSession) {
-		throw new Error("Session could not be updated.");
+		if (!updatedSession) {
+			throw new Error("Session could not be updated.");
+		}
+
+		return toSessionDto(updatedSession, true);
+	} catch (error) {
+		if (
+			isPostgresUniqueViolation(error, "sessions_owner_active_start_unique_idx")
+		) {
+			throw new ConflictError(
+				"You already have an active session at this start time.",
+			);
+		}
+
+		throw error;
 	}
-
-	// TODO: Hide meetingLink based on owner/selected partner authorization.
-	const { id, ...sessionData } = updatedSession;
-
-	return {
-		sessionId: id,
-		...sessionData,
-	};
 }
 
 export async function deleteSession(sessionId: string, ownerId: string) {
@@ -108,12 +127,27 @@ export async function deleteSession(sessionId: string, ownerId: string) {
 		throw new ForbiddenError("Deletion not allowed.");
 	}
 
+	if (existingSession.status !== "open") {
+		throw new ConflictError("Only open sessions can be permanently deleted.");
+	}
+
+	const hasRequestHistory =
+		await sessionRepository.hasSessionRequests(sessionId);
+
+	if (hasRequestHistory) {
+		throw new ConflictError(
+			"Sessions with request history cannot be permanently deleted.",
+		);
+	}
+
 	const deletedSession = await sessionRepository.deleteSession(
 		sessionId,
 		ownerId,
 	);
 
 	if (!deletedSession) {
-		throw new Error("Session could not be deleted.");
+		throw new ConflictError(
+			"Session could not be deleted because its state changed.",
+		);
 	}
 }

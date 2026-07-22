@@ -1,4 +1,4 @@
-import { and, asc, eq, gte } from "drizzle-orm";
+import { and, asc, eq, gte, notExists } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { sessions, sessionRequests } from "../db/schema.js";
 import type {
@@ -77,7 +77,21 @@ export async function updateSession(
 export async function deleteSession(sessionId: string, ownerId: string) {
 	const [deletedSession] = await db
 		.delete(sessions)
-		.where(and(eq(sessions.id, sessionId), eq(sessions.ownerId, ownerId)))
+		.where(
+			and(
+				eq(sessions.id, sessionId),
+				eq(sessions.ownerId, ownerId),
+				eq(sessions.status, "open"),
+				notExists(
+					db
+						.select({
+							id: sessionRequests.id,
+						})
+						.from(sessionRequests)
+						.where(eq(sessionRequests.sessionId, sessions.id)),
+				),
+			),
+		)
 		.returning({
 			sessionId: sessions.id,
 		});
@@ -101,6 +115,18 @@ export async function isApprovedRequester(
 				eq(sessionRequests.status, "approved"),
 			),
 		)
+		.limit(1);
+
+	return request !== undefined;
+}
+
+export async function hasSessionRequests(sessionId: string) {
+	const [request] = await db
+		.select({
+			id: sessionRequests.id,
+		})
+		.from(sessionRequests)
+		.where(eq(sessionRequests.sessionId, sessionId))
 		.limit(1);
 
 	return request !== undefined;
