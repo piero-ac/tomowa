@@ -82,7 +82,9 @@ export const sessions = pgTable(
 			"sessions_duration_minutes_check",
 			sql`${table.durationMinutes} BETWEEN 15 AND 120`,
 		),
-
+		uniqueIndex("sessions_owner_active_start_unique_idx")
+			.on(table.ownerId, table.startsAt)
+			.where(sql`${table.status} IN ('open', 'booked')`),
 		index("sessions_open_starts_at_id_idx")
 			.on(table.startsAt, table.id)
 			.where(sql`${table.status} = 'open'`),

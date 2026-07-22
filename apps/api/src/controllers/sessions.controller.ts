@@ -1,6 +1,7 @@
 import { type Request, type Response } from "express";
 import {
 	createSessionSchema,
+	listSessionsQuerySchema,
 	sessionIdSchema,
 	updateSessionSchema,
 } from "../validation/session.schema.js";
@@ -9,12 +10,25 @@ import * as sessionService from "../services/sessions.service.js";
 import { BadRequestError, UnauthorizedError } from "../errors/index.js";
 
 export async function getSessions(req: Request, res: Response) {
-	const sessions = await sessionService.getSessions();
+	const result = listSessionsQuerySchema.safeParse(req.query);
+
+	if (!result.success) {
+		throw new BadRequestError(
+			"Invalid query parameters.",
+			z.flattenError(result.error),
+		);
+	}
+
+	const sessions = await sessionService.getSessions(result.data.limit);
 
 	res.status(200).json(sessions);
 }
 
 export async function getSessionById(req: Request, res: Response) {
+	if (!req.user) {
+		throw new UnauthorizedError();
+	}
+
 	const result = sessionIdSchema.safeParse(req.params);
 
 	if (!result.success) {
@@ -24,7 +38,10 @@ export async function getSessionById(req: Request, res: Response) {
 		);
 	}
 
-	const session = await sessionService.getSessionById(result.data.sessionId);
+	const session = await sessionService.getSessionById(
+		result.data.sessionId,
+		req.user.id,
+	);
 
 	res.status(200).json(session);
 }
