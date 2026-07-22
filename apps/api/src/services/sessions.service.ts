@@ -1,49 +1,62 @@
 import * as sessionRepository from "../repositories/sessions.repository.js";
 import type {
 	CreateSessionInput,
+	CreateSessionResponseDto,
 	UpdateSessionInput,
 } from "../types/session.js";
 import {
 	BadRequestError,
+	ConflictError,
 	ForbiddenError,
 	NotFoundError,
 } from "../errors/index.js";
+import { toSessionDto } from "../mappers/session.mapper.js";
+import { isPostgresUniqueViolation } from "../db/postgres-error.js";
 
-export async function getSessions() {
-	const sessions = await sessionRepository.getSessions();
-	return sessions.map(({ id, ...session }) => ({
-		sessionId: id,
-		...session,
-	}));
+export async function getSessions(limit: number) {
+	const sessions = await sessionRepository.getSessions(limit);
+	return sessions.map((session) => toSessionDto(session));
 }
 
-export async function getSessionById(sessionId: string) {
+export async function getSessionById(sessionId: string, viewerId: string) {
 	const session = await sessionRepository.getSessionById(sessionId);
 
 	if (!session) {
 		throw new NotFoundError("Session not found.");
 	}
 
-	// TODO: Hide meetingLink based on attendee and organizer id check
-	const { id, ...sessionData } = session;
-	return {
-		sessionId: id,
-		...sessionData,
-	};
+	const canViewMeetingLink =
+		session.ownerId === viewerId ||
+		(await sessionRepository.isApprovedRequester(sessionId, viewerId));
+	return toSessionDto(session, canViewMeetingLink);
 }
 
-export async function createSession(input: CreateSessionInput) {
+export async function createSession(
+	input: CreateSessionInput,
+): Promise<CreateSessionResponseDto> {
 	if (input.startsAt <= new Date()) {
 		throw new BadRequestError("Session must start in the future.");
 	}
 
-	const createdSession = await sessionRepository.createSession(input);
+	try {
+		const createdSession = await sessionRepository.createSession(input);
 
-	if (!createdSession) {
-		throw new Error("Session could not be created.");
+		if (!createdSession) {
+			throw new Error("Session could not be created.");
+		}
+
+		return createdSession;
+	} catch (error) {
+		if (
+			isPostgresUniqueViolation(error, "sessions_owner_active_start_unique_idx")
+		) {
+			throw new ConflictError(
+				"You already have an active session at this start time.",
+			);
+		}
+
+		throw error;
 	}
-
-	return createdSession;
 }
 
 export async function updateSession(

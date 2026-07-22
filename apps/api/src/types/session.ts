@@ -1,4 +1,26 @@
-import type { InsertSession } from "../db/schema.js";
+import type { InsertSession, SelectSession } from "../db/schema.js";
+
+export interface CreateSessionResponseDto {
+	sessionId: string;
+}
+
+export type SessionStatus = SelectSession["status"];
+
+export interface SessionDto {
+	sessionId: string;
+	ownerId: string;
+	title: string;
+	targetLanguage: string;
+	helpLanguage: string;
+	startsAt: string;
+	durationMinutes: number;
+	status: SessionStatus;
+	imageKey: string | null;
+	description: string;
+	createdAt: string;
+	updatedAt: string;
+	meetingLink?: string;
+}
 
 export type CreateSessionInput = Pick<
 	InsertSession,
