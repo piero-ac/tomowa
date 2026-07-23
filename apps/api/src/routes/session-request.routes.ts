@@ -15,4 +15,9 @@ router.post(
 	"/:requestId/cancel",
 	sessionRequestController.cancelSessionRequest,
 );
+router.post(
+	"/:requestId/approve",
+	sessionRequestController.approveSessionRequest,
+);
+
 export default router;
