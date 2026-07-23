@@ -86,3 +86,26 @@ export async function cancelSessionRequest(req: Request, res: Response) {
 
 	res.status(200).json(cancelledRequest);
 }
+
+export async function approveSessionRequest(req: Request, res: Response) {
+	if (!req.user) {
+		throw new UnauthorizedError();
+	}
+
+	const paramsResult = sessionRequestParamsSchema.safeParse(req.params);
+
+	if (!paramsResult.success) {
+		throw new BadRequestError(
+			"Invalid session or request ID.",
+			z.flattenError(paramsResult.error),
+		);
+	}
+
+	const approvedRequest = await sessionRequestService.approveSessionRequest(
+		paramsResult.data.sessionId,
+		paramsResult.data.requestId,
+		req.user.id,
+	);
+
+	res.status(200).json(approvedRequest);
+}
