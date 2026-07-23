@@ -1,10 +1,22 @@
-import { and, asc, eq, gte, notExists } from "drizzle-orm";
+import { and, asc, eq, gte, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { sessions, sessionRequests } from "../db/schema.js";
 import type {
 	CreateSessionInput,
 	UpdateSessionInput,
 } from "../types/session.js";
+
+export type DeleteOrCancelSessionResult =
+	| {
+			outcome: "deleted" | "cancelled";
+	  }
+	| {
+			outcome:
+				| "session_not_found"
+				| "forbidden"
+				| "session_started"
+				| "session_not_cancellable";
+	  };
 
 export async function getSessions(limit: number) {
 	return db
@@ -74,31 +86,6 @@ export async function updateSession(
 	return updatedSession ?? null;
 }
 
-export async function deleteSession(sessionId: string, ownerId: string) {
-	const [deletedSession] = await db
-		.delete(sessions)
-		.where(
-			and(
-				eq(sessions.id, sessionId),
-				eq(sessions.ownerId, ownerId),
-				eq(sessions.status, "open"),
-				notExists(
-					db
-						.select({
-							id: sessionRequests.id,
-						})
-						.from(sessionRequests)
-						.where(eq(sessionRequests.sessionId, sessions.id)),
-				),
-			),
-		)
-		.returning({
-			sessionId: sessions.id,
-		});
-
-	return deletedSession ?? null;
-}
-
 export async function isApprovedRequester(
 	sessionId: string,
 	requesterId: string,
@@ -120,14 +107,83 @@ export async function isApprovedRequester(
 	return request !== undefined;
 }
 
-export async function hasSessionRequests(sessionId: string) {
-	const [request] = await db
-		.select({
-			id: sessionRequests.id,
-		})
-		.from(sessionRequests)
-		.where(eq(sessionRequests.sessionId, sessionId))
-		.limit(1);
+export async function deleteOrCancelSession(
+	sessionId: string,
+	ownerId: string,
+): Promise<DeleteOrCancelSessionResult> {
+	return db.transaction(async (tx) => {
+		const [session] = await tx
+			.select()
+			.from(sessions)
+			.where(eq(sessions.id, sessionId))
+			.limit(1)
+			.for("update");
 
-	return request !== undefined;
+		if (!session) {
+			return {
+				outcome: "session_not_found",
+			};
+		}
+
+		if (session.ownerId !== ownerId) {
+			return {
+				outcome: "forbidden",
+			};
+		}
+
+		if (session.status === "cancelled" || session.status === "completed") {
+			return {
+				outcome: "session_not_cancellable",
+			};
+		}
+
+		if (session.startsAt <= new Date()) {
+			return {
+				outcome: "session_started",
+			};
+		}
+
+		const [requestHistory] = await tx
+			.select({
+				id: sessionRequests.id,
+			})
+			.from(sessionRequests)
+			.where(eq(sessionRequests.sessionId, sessionId))
+			.limit(1);
+
+		if (!requestHistory && session.status === "open") {
+			await tx.delete(sessions).where(eq(sessions.id, sessionId));
+
+			return {
+				outcome: "deleted",
+			};
+		}
+
+		const now = new Date();
+
+		await tx
+			.update(sessions)
+			.set({
+				status: "cancelled",
+				updatedAt: now,
+			})
+			.where(eq(sessions.id, sessionId));
+
+		await tx
+			.update(sessionRequests)
+			.set({
+				status: "cancelled",
+				updatedAt: now,
+			})
+			.where(
+				and(
+					eq(sessionRequests.sessionId, sessionId),
+					inArray(sessionRequests.status, ["pending", "approved"]),
+				),
+			);
+
+		return {
+			outcome: "cancelled",
+		};
+	});
 }

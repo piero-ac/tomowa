@@ -117,37 +117,38 @@ export async function updateSession(
 }
 
 export async function deleteSession(sessionId: string, ownerId: string) {
-	const existingSession = await sessionRepository.getSessionById(sessionId);
-
-	if (!existingSession) {
-		throw new NotFoundError("Session not found.");
-	}
-
-	if (existingSession.ownerId !== ownerId) {
-		throw new ForbiddenError("Deletion not allowed.");
-	}
-
-	if (existingSession.status !== "open") {
-		throw new ConflictError("Only open sessions can be permanently deleted.");
-	}
-
-	const hasRequestHistory =
-		await sessionRepository.hasSessionRequests(sessionId);
-
-	if (hasRequestHistory) {
-		throw new ConflictError(
-			"Sessions with request history cannot be permanently deleted.",
-		);
-	}
-
-	const deletedSession = await sessionRepository.deleteSession(
+	const result = await sessionRepository.deleteOrCancelSession(
 		sessionId,
 		ownerId,
 	);
 
-	if (!deletedSession) {
-		throw new ConflictError(
-			"Session could not be deleted because its state changed.",
-		);
+	switch (result.outcome) {
+		case "deleted":
+		case "cancelled":
+			return;
+
+		case "session_not_found":
+			throw new NotFoundError("Session not found.");
+
+		case "forbidden":
+			throw new ForbiddenError(
+				"Only the session owner can delete or cancel it.",
+			);
+
+		case "session_started":
+			throw new ConflictError("Started sessions cannot be cancelled.");
+
+		case "session_not_cancellable":
+			throw new ConflictError(
+				"Completed or cancelled sessions cannot be cancelled.",
+			);
+
+		default: {
+			const unhandledResult: never = result;
+
+			throw new Error(
+				`Unhandled session cancellation result: ${JSON.stringify(unhandledResult)}`,
+			);
+		}
 	}
 }
