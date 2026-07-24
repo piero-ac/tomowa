@@ -86,4 +86,13 @@ describe("API error handling", () => {
 		expect(response.status).toBe(400);
 		expect(response.body.message).toBe("Invalid query parameters.");
 	});
+
+	it("returns 404 for an unknown route", async () => {
+		const response = await request(app).get("/route-that-does-not-exist");
+
+		expect(response.status).toBe(404);
+		expect(response.body).toEqual({
+			message: "Route not found.",
+		});
+	});
 });
