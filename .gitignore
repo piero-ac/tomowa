@@ -29,3 +29,6 @@ cdk.out/
 **/supabase/.temp/
 **/supabase/.branches/
 **/supabase/snippets/
+
+# Test Coverage
+**/coverage/
