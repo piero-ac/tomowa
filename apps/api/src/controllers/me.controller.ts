@@ -25,3 +25,13 @@ export async function getUserSessionRequests(req: Request, res: Response) {
 
 	res.status(200).json(requests);
 }
+
+export async function getBookedSessions(req: Request, res: Response) {
+	if (!req.user) {
+		throw new UnauthorizedError();
+	}
+
+	const sessions = await sessionService.getBookedSessionsForUser(req.user.id);
+
+	res.status(200).json(sessions);
+}

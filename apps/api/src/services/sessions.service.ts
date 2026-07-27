@@ -10,7 +10,11 @@ import {
 	ForbiddenError,
 	NotFoundError,
 } from "../errors/index.js";
-import { toOwnedSessionDto, toSessionDto } from "../mappers/session.mapper.js";
+import {
+	toBookedSessionDto,
+	toOwnedSessionDto,
+	toSessionDto,
+} from "../mappers/session.mapper.js";
 import { isPostgresUniqueViolation } from "../db/postgres-error.js";
 
 export async function getSessions(limit: number) {
@@ -22,6 +26,13 @@ export async function getOwnedSessions(ownerId: string) {
 	const ownedSessions = await sessionRepository.getOwnedSessions(ownerId);
 
 	return ownedSessions.map((session) => toOwnedSessionDto(session));
+}
+
+export async function getBookedSessionsForUser(userId: string) {
+	const bookedSessions =
+		await sessionRepository.getBookedSessionsForUser(userId);
+
+	return bookedSessions.map((session) => toBookedSessionDto(session));
 }
 
 export async function getSessionById(sessionId: string, viewerId: string) {

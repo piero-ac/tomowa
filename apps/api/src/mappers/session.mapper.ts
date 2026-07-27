@@ -1,5 +1,9 @@
 import type { SelectSession } from "../db/schema.js";
-import type { OwnedSessionDto, SessionDto } from "../types/session.js";
+import type {
+	BookedSessionDto,
+	OwnedSessionDto,
+	SessionDto,
+} from "../types/session.js";
 
 interface SessionDtoSource extends Omit<SelectSession, "meetingLink"> {
 	meetingLink?: string;
@@ -49,5 +53,12 @@ export function toOwnedSessionDto(
 			cancelled: session.cancelledRequestCount,
 			total: session.totalRequestCount,
 		},
+	};
+}
+
+export function toBookedSessionDto(session: SelectSession): BookedSessionDto {
+	return {
+		...toSessionDto(session, true),
+		meetingLink: session.meetingLink,
 	};
 }

@@ -6,5 +6,6 @@ const router = express.Router();
 
 router.get("/sessions-created", meController.getCreatedSessions);
 router.get("/session-requests", meController.getUserSessionRequests);
+router.get("/sessions-booked", meController.getBookedSessions);
 
 export default router;

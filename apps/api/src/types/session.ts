@@ -61,3 +61,7 @@ export interface OwnedSessionDto extends SessionDto {
 	meetingLink: string;
 	requestSummary: SessionRequestSummaryDto;
 }
+
+export interface BookedSessionDto extends SessionDto {
+	meetingLink: string;
+}
