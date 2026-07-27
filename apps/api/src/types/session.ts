@@ -48,3 +48,16 @@ export type UpdateSessionInput = Partial<
 		| "description"
 	>
 >;
+
+export interface SessionRequestSummaryDto {
+	pending: number;
+	approved: number;
+	declined: number;
+	cancelled: number;
+	total: number;
+}
+
+export interface OwnedSessionDto extends SessionDto {
+	meetingLink: string;
+	requestSummary: SessionRequestSummaryDto;
+}
