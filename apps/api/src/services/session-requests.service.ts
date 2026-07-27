@@ -53,6 +53,22 @@ export async function createSessionRequest(input: CreateSessionRequestInput) {
 	}
 }
 
+export async function getSessionRequests(sessionId: string, ownerId: string) {
+	const session = await sessionRepository.getSessionById(sessionId);
+
+	if (!session) {
+		throw new NotFoundError("Session not found.");
+	}
+
+	if (session.ownerId !== ownerId) {
+		throw new ForbiddenError("Only the session owner can view its requests.");
+	}
+
+	const requests = await sessionRequestRepository.getSessionRequests(sessionId);
+
+	return requests.map((request) => toSessionRequestDto(request));
+}
+
 export async function declineSessionRequest(
 	sessionId: string,
 	requestId: string,

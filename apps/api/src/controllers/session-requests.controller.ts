@@ -41,6 +41,28 @@ export async function createSessionRequest(req: Request, res: Response) {
 	res.status(201).json(createdRequest);
 }
 
+export async function getSessionRequests(req: Request, res: Response) {
+	if (!req.user) {
+		throw new UnauthorizedError();
+	}
+
+	const paramsResult = sessionIdSchema.safeParse(req.params);
+
+	if (!paramsResult.success) {
+		throw new BadRequestError(
+			"Invalid session ID.",
+			z.flattenError(paramsResult.error),
+		);
+	}
+
+	const requests = await sessionRequestService.getSessionRequests(
+		paramsResult.data.sessionId,
+		req.user.id,
+	);
+
+	res.status(200).json(requests);
+}
+
 export async function declineSessionRequest(req: Request, res: Response) {
 	if (!req.user) {
 		throw new UnauthorizedError();
