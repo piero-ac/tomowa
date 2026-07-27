@@ -1,7 +1,7 @@
 import "dotenv/config";
 
 import { createClient } from "@supabase/supabase-js";
-import { eq } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { z } from "zod";
@@ -131,12 +131,13 @@ async function seed() {
 	}
 
 	const ownerId = userIds.get("owner@example.test");
+	const seededUserIds = [...userIds.values()];
 
-	if (!ownerId) {
-		throw new Error("Seed owner was not created.");
+	if (!ownerId || seededUserIds.length !== seedUsers.length) {
+		throw new Error("Seed users were not created.");
 	}
 
-	await db.delete(sessions).where(eq(sessions.ownerId, ownerId));
+	await db.delete(sessions).where(inArray(sessions.ownerId, seededUserIds));
 
 	const now = Date.now();
 
