@@ -4,7 +4,10 @@ import {
 	ForbiddenError,
 	NotFoundError,
 } from "../errors/index.js";
-import { toSessionRequestDto } from "../mappers/session-request.mapper.js";
+import {
+	toSessionRequestDto,
+	toUserSessionRequestDto,
+} from "../mappers/session-request.mapper.js";
 import * as sessionRequestRepository from "../repositories/session-requests.repository.js";
 import * as sessionRepository from "../repositories/sessions.repository.js";
 import type { CreateSessionRequestInput } from "../types/session-request.js";
@@ -51,6 +54,29 @@ export async function createSessionRequest(input: CreateSessionRequestInput) {
 
 		throw error;
 	}
+}
+
+export async function getSessionRequests(sessionId: string, ownerId: string) {
+	const session = await sessionRepository.getSessionById(sessionId);
+
+	if (!session) {
+		throw new NotFoundError("Session not found.");
+	}
+
+	if (session.ownerId !== ownerId) {
+		throw new ForbiddenError("Only the session owner can view its requests.");
+	}
+
+	const requests = await sessionRequestRepository.getSessionRequests(sessionId);
+
+	return requests.map((request) => toSessionRequestDto(request));
+}
+
+export async function getUserSessionRequests(requesterId: string) {
+	const requests =
+		await sessionRequestRepository.getUserSessionRequests(requesterId);
+
+	return requests.map((request) => toUserSessionRequestDto(request));
 }
 
 export async function declineSessionRequest(

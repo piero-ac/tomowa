@@ -1,12 +1,11 @@
-import express, { type Request, type Response } from "express";
+import express from "express";
+
+import * as meController from "../controllers/me.controller.js";
 
 const router = express.Router();
 
-router.get("/", (req: Request, res: Response) => {
-	res.status(501).json({
-		status: "not-implemented",
-		service: "tomowa-api-me",
-	});
-});
+router.get("/sessions-created", meController.getCreatedSessions);
+router.get("/session-requests", meController.getUserSessionRequests);
+router.get("/sessions-booked", meController.getBookedSessions);
 
 export default router;

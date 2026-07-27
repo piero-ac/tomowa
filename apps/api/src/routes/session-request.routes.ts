@@ -6,6 +6,7 @@ const router = express.Router({
 	mergeParams: true,
 });
 
+router.get("/", sessionRequestController.getSessionRequests);
 router.post("/", sessionRequestController.createSessionRequest);
 router.post(
 	"/:requestId/decline",

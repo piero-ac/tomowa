@@ -1,7 +1,7 @@
 import { db } from "../db/index.js";
 import { sessionRequests, sessions } from "../db/schema.js";
 import type { CreateSessionRequestInput } from "../types/session-request.js";
-import { and, eq, ne } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import type { SelectSessionRequest } from "../db/schema.js";
 
 export type ApproveSessionRequestResult =
@@ -115,6 +115,26 @@ export async function getSessionRequest(sessionId: string, requestId: string) {
 		.limit(1);
 
 	return request ?? null;
+}
+
+export async function getSessionRequests(sessionId: string) {
+	return db
+		.select()
+		.from(sessionRequests)
+		.where(eq(sessionRequests.sessionId, sessionId))
+		.orderBy(desc(sessionRequests.createdAt), desc(sessionRequests.id));
+}
+
+export async function getUserSessionRequests(requesterId: string) {
+	return db
+		.select({
+			request: sessionRequests,
+			session: sessions,
+		})
+		.from(sessionRequests)
+		.innerJoin(sessions, eq(sessions.id, sessionRequests.sessionId))
+		.where(eq(sessionRequests.requesterId, requesterId))
+		.orderBy(desc(sessionRequests.createdAt), desc(sessionRequests.id));
 }
 
 export async function declineSessionRequest(

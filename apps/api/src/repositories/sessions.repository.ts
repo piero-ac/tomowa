@@ -1,4 +1,14 @@
-import { and, asc, eq, gte, inArray } from "drizzle-orm";
+import {
+	and,
+	asc,
+	desc,
+	eq,
+	getColumns,
+	gte,
+	inArray,
+	or,
+	sql,
+} from "drizzle-orm";
 import { db } from "../db/index.js";
 import { sessions, sessionRequests } from "../db/schema.js";
 import type {
@@ -38,6 +48,63 @@ export async function getSessions(limit: number) {
 		.where(and(eq(sessions.status, "open"), gte(sessions.startsAt, new Date())))
 		.orderBy(asc(sessions.startsAt), asc(sessions.id))
 		.limit(limit);
+}
+
+export async function getOwnedSessions(ownerId: string) {
+	return db
+		.select({
+			...getColumns(sessions),
+			pendingRequestCount:
+				sql<number>`count(${sessionRequests.id}) filter (where ${sessionRequests.status} = 'pending')`.mapWith(
+					Number,
+				),
+			approvedRequestCount:
+				sql<number>`count(${sessionRequests.id}) filter (where ${sessionRequests.status} = 'approved')`.mapWith(
+					Number,
+				),
+			declinedRequestCount:
+				sql<number>`count(${sessionRequests.id}) filter (where ${sessionRequests.status} = 'declined')`.mapWith(
+					Number,
+				),
+			cancelledRequestCount:
+				sql<number>`count(${sessionRequests.id}) filter (where ${sessionRequests.status} = 'cancelled')`.mapWith(
+					Number,
+				),
+			totalRequestCount: sql<number>`count(${sessionRequests.id})`.mapWith(
+				Number,
+			),
+		})
+		.from(sessions)
+		.leftJoin(sessionRequests, eq(sessionRequests.sessionId, sessions.id))
+		.where(eq(sessions.ownerId, ownerId))
+		.groupBy(sessions.id)
+		.orderBy(desc(sessions.startsAt), desc(sessions.id));
+}
+
+export async function getBookedSessionsForUser(userId: string) {
+	return db
+		.select({
+			...getColumns(sessions),
+		})
+		.from(sessions)
+		.leftJoin(
+			sessionRequests,
+			and(
+				eq(sessionRequests.sessionId, sessions.id),
+				eq(sessionRequests.status, "approved"),
+			),
+		)
+		.where(
+			and(
+				eq(sessions.status, "booked"),
+				gte(sessions.startsAt, new Date()),
+				or(
+					eq(sessions.ownerId, userId),
+					eq(sessionRequests.requesterId, userId),
+				),
+			),
+		)
+		.orderBy(asc(sessions.startsAt), asc(sessions.id));
 }
 
 export async function getSessionById(sessionId: string) {
