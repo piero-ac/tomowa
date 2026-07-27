@@ -125,6 +125,18 @@ export async function getSessionRequests(sessionId: string) {
 		.orderBy(desc(sessionRequests.createdAt), desc(sessionRequests.id));
 }
 
+export async function getUserSessionRequests(requesterId: string) {
+	return db
+		.select({
+			request: sessionRequests,
+			session: sessions,
+		})
+		.from(sessionRequests)
+		.innerJoin(sessions, eq(sessions.id, sessionRequests.sessionId))
+		.where(eq(sessionRequests.requesterId, requesterId))
+		.orderBy(desc(sessionRequests.createdAt), desc(sessionRequests.id));
+}
+
 export async function declineSessionRequest(
 	sessionId: string,
 	requestId: string,
