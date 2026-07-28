@@ -1,3 +1,5 @@
+import type { InsertProfile } from "../db/schema.js";
+
 export interface ProfileDto {
 	userId: string;
 	displayName: string | null;
@@ -10,3 +12,15 @@ export interface ProfileDto {
 	createdAt: string;
 	updatedAt: string;
 }
+
+export type UpdateProfileInput = Partial<
+	Pick<
+		InsertProfile,
+		| "displayName"
+		| "username"
+		| "bio"
+		| "nativeLanguage"
+		| "learningLanguage"
+		| "timezone"
+	>
+>;
