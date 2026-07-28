@@ -157,5 +157,20 @@ describe("GET /api/me/sessions-created", () => {
 				total: 4,
 			},
 		});
+
+		for (const session of response.body) {
+			expect(session.owner).toEqual({
+				userId: session.ownerId,
+				displayName: "Other User",
+				username: null,
+				avatarKey: null,
+				nativeLanguage: null,
+				learningLanguage: null,
+			});
+
+			expect(session.owner).not.toHaveProperty("bio");
+			expect(session.owner).not.toHaveProperty("timezone");
+			expect(session.owner).not.toHaveProperty("createdAt");
+		}
 	});
 });

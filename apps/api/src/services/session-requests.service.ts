@@ -7,6 +7,7 @@ import {
 import {
 	toSessionRequestDto,
 	toUserSessionRequestDto,
+	toSessionRequestWithRequesterDto,
 } from "../mappers/session-request.mapper.js";
 import * as sessionRequestRepository from "../repositories/session-requests.repository.js";
 import * as sessionRepository from "../repositories/sessions.repository.js";
@@ -69,7 +70,7 @@ export async function getSessionRequests(sessionId: string, ownerId: string) {
 
 	const requests = await sessionRequestRepository.getSessionRequests(sessionId);
 
-	return requests.map((request) => toSessionRequestDto(request));
+	return requests.map((request) => toSessionRequestWithRequesterDto(request));
 }
 
 export async function getUserSessionRequests(requesterId: string) {

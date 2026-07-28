@@ -1,5 +1,5 @@
 import { db } from "../db/index.js";
-import { sessionRequests, sessions } from "../db/schema.js";
+import { profiles, sessionRequests, sessions } from "../db/schema.js";
 import type { CreateSessionRequestInput } from "../types/session-request.js";
 import { and, desc, eq, ne } from "drizzle-orm";
 import type { SelectSessionRequest } from "../db/schema.js";
@@ -119,8 +119,12 @@ export async function getSessionRequest(sessionId: string, requestId: string) {
 
 export async function getSessionRequests(sessionId: string) {
 	return db
-		.select()
+		.select({
+			request: sessionRequests,
+			requester: profiles,
+		})
 		.from(sessionRequests)
+		.innerJoin(profiles, eq(profiles.id, sessionRequests.requesterId))
 		.where(eq(sessionRequests.sessionId, sessionId))
 		.orderBy(desc(sessionRequests.createdAt), desc(sessionRequests.id));
 }
@@ -130,9 +134,11 @@ export async function getUserSessionRequests(requesterId: string) {
 		.select({
 			request: sessionRequests,
 			session: sessions,
+			owner: profiles,
 		})
 		.from(sessionRequests)
 		.innerJoin(sessions, eq(sessions.id, sessionRequests.sessionId))
+		.innerJoin(profiles, eq(profiles.id, sessions.ownerId))
 		.where(eq(sessionRequests.requesterId, requesterId))
 		.orderBy(desc(sessionRequests.createdAt), desc(sessionRequests.id));
 }

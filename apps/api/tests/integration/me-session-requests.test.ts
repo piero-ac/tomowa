@@ -198,5 +198,20 @@ describe("GET /api/me/session-requests", () => {
 
 		expect(cancelledRequest.status).toBe("cancelled");
 		expect(cancelledRequest.session).not.toHaveProperty("meetingLink");
+
+		for (const requestItem of response.body) {
+			expect(requestItem.session.owner).toEqual({
+				userId: requestItem.session.ownerId,
+				displayName: "Session Owner",
+				username: null,
+				avatarKey: null,
+				nativeLanguage: null,
+				learningLanguage: null,
+			});
+
+			expect(requestItem.session.owner).not.toHaveProperty("bio");
+			expect(requestItem.session.owner).not.toHaveProperty("timezone");
+			expect(requestItem.session.owner).not.toHaveProperty("createdAt");
+		}
 	});
 });

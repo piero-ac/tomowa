@@ -24,3 +24,12 @@ export type UpdateProfileInput = Partial<
 		| "timezone"
 	>
 >;
+
+export interface PublicProfileSummaryDto {
+	userId: string;
+	displayName: string | null;
+	username: string | null;
+	avatarKey: string | null;
+	nativeLanguage: string | null;
+	learningLanguage: string | null;
+}

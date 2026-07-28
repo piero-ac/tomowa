@@ -1,5 +1,6 @@
 import type { SelectSessionRequest } from "../db/schema.js";
-import type { SessionDto } from "./session.js";
+import type { SessionWithOwnerDto } from "./session.js";
+import type { PublicProfileSummaryDto } from "./profile.js";
 
 export type SessionRequestStatus = SelectSessionRequest["status"];
 
@@ -14,8 +15,12 @@ export interface SessionRequestDto {
 	updatedAt: string;
 }
 
+export interface SessionRequestWithRequesterDto extends SessionRequestDto {
+	requester: PublicProfileSummaryDto;
+}
+
 export interface UserSessionRequestDto extends SessionRequestDto {
-	session: SessionDto;
+	session: SessionWithOwnerDto;
 }
 
 export interface CreateSessionRequestInput {

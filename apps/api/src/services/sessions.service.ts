@@ -14,12 +14,14 @@ import {
 	toBookedSessionDto,
 	toOwnedSessionDto,
 	toSessionDto,
+	toSessionWithOwnerDto,
 } from "../mappers/session.mapper.js";
 import { isPostgresUniqueViolation } from "../db/postgres-error.js";
 
 export async function getSessions(limit: number) {
 	const sessions = await sessionRepository.getSessions(limit);
-	return sessions.map((session) => toSessionDto(session));
+
+	return sessions.map((session) => toSessionWithOwnerDto(session));
 }
 
 export async function getOwnedSessions(ownerId: string) {
@@ -36,16 +38,17 @@ export async function getBookedSessionsForUser(userId: string) {
 }
 
 export async function getSessionById(sessionId: string, viewerId: string) {
-	const session = await sessionRepository.getSessionById(sessionId);
+	const result = await sessionRepository.getSessionWithOwnerById(sessionId);
 
-	if (!session) {
+	if (!result) {
 		throw new NotFoundError("Session not found.");
 	}
 
 	const canViewMeetingLink =
-		session.ownerId === viewerId ||
+		result.session.ownerId === viewerId ||
 		(await sessionRepository.isApprovedRequester(sessionId, viewerId));
-	return toSessionDto(session, canViewMeetingLink);
+
+	return toSessionWithOwnerDto(result, canViewMeetingLink);
 }
 
 export async function createSession(

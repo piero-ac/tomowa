@@ -30,6 +30,19 @@ describe("GET /api/sessions", () => {
 
 		for (const session of response.body) {
 			expect(session).not.toHaveProperty("meetingLink");
+
+			expect(session.owner).toEqual({
+				userId: session.ownerId,
+				displayName: "Session Owner",
+				username: null,
+				avatarKey: null,
+				nativeLanguage: null,
+				learningLanguage: null,
+			});
+
+			expect(session.owner).not.toHaveProperty("bio");
+			expect(session.owner).not.toHaveProperty("timezone");
+			expect(session.owner).not.toHaveProperty("createdAt");
 		}
 	});
 });
@@ -44,6 +57,15 @@ describe("GET /api/sessions/:sessionId", () => {
 		expect(response.body.meetingLink).toBe(
 			"https://example.test/meeting/japanese",
 		);
+
+		expect(response.body.owner).toEqual({
+			userId: response.body.ownerId,
+			displayName: "Session Owner",
+			username: null,
+			avatarKey: null,
+			nativeLanguage: null,
+			learningLanguage: null,
+		});
 	});
 
 	it("hides the meeting link from an unrelated user", async () => {

@@ -1,4 +1,5 @@
 import type { InsertSession, SelectSession } from "../db/schema.js";
+import type { PublicProfileSummaryDto } from "./profile.js";
 
 export interface CreateSessionResponseDto {
 	sessionId: string;
@@ -20,6 +21,10 @@ export interface SessionDto {
 	createdAt: string;
 	updatedAt: string;
 	meetingLink?: string;
+}
+
+export interface SessionWithOwnerDto extends SessionDto {
+	owner: PublicProfileSummaryDto;
 }
 
 export type CreateSessionInput = Pick<
@@ -57,11 +62,11 @@ export interface SessionRequestSummaryDto {
 	total: number;
 }
 
-export interface OwnedSessionDto extends SessionDto {
+export interface OwnedSessionDto extends SessionWithOwnerDto {
 	meetingLink: string;
 	requestSummary: SessionRequestSummaryDto;
 }
 
-export interface BookedSessionDto extends SessionDto {
+export interface BookedSessionDto extends SessionWithOwnerDto {
 	meetingLink: string;
 }

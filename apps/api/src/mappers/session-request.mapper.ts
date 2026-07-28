@@ -1,13 +1,25 @@
-import type { SelectSession, SelectSessionRequest } from "../db/schema.js";
+import type {
+	SelectProfile,
+	SelectSession,
+	SelectSessionRequest,
+} from "../db/schema.js";
 import type {
 	SessionRequestDto,
+	SessionRequestWithRequesterDto,
 	UserSessionRequestDto,
 } from "../types/session-request.js";
-import { toSessionDto } from "./session.mapper.js";
+import { toSessionWithOwnerDto } from "./session.mapper.js";
+import { toPublicProfileSummaryDto } from "./profile.mapper.js";
 
 interface UserSessionRequestDtoSource {
 	request: SelectSessionRequest;
 	session: SelectSession;
+	owner: SelectProfile;
+}
+
+interface SessionRequestWithRequesterDtoSource {
+	request: SelectSessionRequest;
+	requester: SelectProfile;
 }
 
 export function toSessionRequestDto(
@@ -30,6 +42,21 @@ export function toUserSessionRequestDto(
 ): UserSessionRequestDto {
 	return {
 		...toSessionRequestDto(source.request),
-		session: toSessionDto(source.session, source.request.status === "approved"),
+		session: toSessionWithOwnerDto(
+			{
+				session: source.session,
+				owner: source.owner,
+			},
+			source.request.status === "approved",
+		),
+	};
+}
+
+export function toSessionRequestWithRequesterDto(
+	source: SessionRequestWithRequesterDtoSource,
+): SessionRequestWithRequesterDto {
+	return {
+		...toSessionRequestDto(source.request),
+		requester: toPublicProfileSummaryDto(source.requester),
 	};
 }
