@@ -120,5 +120,29 @@ describe("GET /api/sessions/:sessionId/requests", () => {
 		expect(
 			response.body.map((item: { requestId: string }) => item.requestId),
 		).toEqual([newerResponse.body.requestId, olderResponse.body.requestId]);
+
+		expect(response.body[0].requester).toEqual({
+			userId: response.body[0].requesterId,
+			displayName: "Other User",
+			username: null,
+			avatarKey: null,
+			nativeLanguage: null,
+			learningLanguage: null,
+		});
+
+		expect(response.body[1].requester).toEqual({
+			userId: response.body[1].requesterId,
+			displayName: "Session Requester",
+			username: null,
+			avatarKey: null,
+			nativeLanguage: null,
+			learningLanguage: null,
+		});
+
+		for (const item of response.body) {
+			expect(item.requester).not.toHaveProperty("bio");
+			expect(item.requester).not.toHaveProperty("timezone");
+			expect(item.requester).not.toHaveProperty("createdAt");
+		}
 	});
 });

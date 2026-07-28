@@ -1,16 +1,6 @@
-import {
-	and,
-	asc,
-	desc,
-	eq,
-	getColumns,
-	gte,
-	inArray,
-	or,
-	sql,
-} from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { sessions, sessionRequests } from "../db/schema.js";
+import { profiles, sessionRequests, sessions } from "../db/schema.js";
 import type {
 	CreateSessionInput,
 	UpdateSessionInput,
@@ -31,20 +21,24 @@ export type DeleteOrCancelSessionResult =
 export async function getSessions(limit: number) {
 	return db
 		.select({
-			id: sessions.id,
-			ownerId: sessions.ownerId,
-			title: sessions.title,
-			targetLanguage: sessions.targetLanguage,
-			helpLanguage: sessions.helpLanguage,
-			startsAt: sessions.startsAt,
-			durationMinutes: sessions.durationMinutes,
-			status: sessions.status,
-			imageKey: sessions.imageKey,
-			description: sessions.description,
-			createdAt: sessions.createdAt,
-			updatedAt: sessions.updatedAt,
+			session: {
+				id: sessions.id,
+				ownerId: sessions.ownerId,
+				title: sessions.title,
+				targetLanguage: sessions.targetLanguage,
+				helpLanguage: sessions.helpLanguage,
+				startsAt: sessions.startsAt,
+				durationMinutes: sessions.durationMinutes,
+				status: sessions.status,
+				imageKey: sessions.imageKey,
+				description: sessions.description,
+				createdAt: sessions.createdAt,
+				updatedAt: sessions.updatedAt,
+			},
+			owner: profiles,
 		})
 		.from(sessions)
+		.innerJoin(profiles, eq(profiles.id, sessions.ownerId))
 		.where(and(eq(sessions.status, "open"), gte(sessions.startsAt, new Date())))
 		.orderBy(asc(sessions.startsAt), asc(sessions.id))
 		.limit(limit);
@@ -53,7 +47,8 @@ export async function getSessions(limit: number) {
 export async function getOwnedSessions(ownerId: string) {
 	return db
 		.select({
-			...getColumns(sessions),
+			session: sessions,
+			owner: profiles,
 			pendingRequestCount:
 				sql<number>`count(${sessionRequests.id}) filter (where ${sessionRequests.status} = 'pending')`.mapWith(
 					Number,
@@ -75,18 +70,21 @@ export async function getOwnedSessions(ownerId: string) {
 			),
 		})
 		.from(sessions)
+		.innerJoin(profiles, eq(profiles.id, sessions.ownerId))
 		.leftJoin(sessionRequests, eq(sessionRequests.sessionId, sessions.id))
 		.where(eq(sessions.ownerId, ownerId))
-		.groupBy(sessions.id)
+		.groupBy(sessions.id, profiles.id)
 		.orderBy(desc(sessions.startsAt), desc(sessions.id));
 }
 
 export async function getBookedSessionsForUser(userId: string) {
 	return db
 		.select({
-			...getColumns(sessions),
+			session: sessions,
+			owner: profiles,
 		})
 		.from(sessions)
+		.innerJoin(profiles, eq(profiles.id, sessions.ownerId))
 		.leftJoin(
 			sessionRequests,
 			and(
@@ -115,6 +113,20 @@ export async function getSessionById(sessionId: string) {
 		.limit(1);
 
 	return session ?? null;
+}
+
+export async function getSessionWithOwnerById(sessionId: string) {
+	const [result] = await db
+		.select({
+			session: sessions,
+			owner: profiles,
+		})
+		.from(sessions)
+		.innerJoin(profiles, eq(profiles.id, sessions.ownerId))
+		.where(eq(sessions.id, sessionId))
+		.limit(1);
+
+	return result ?? null;
 }
 
 export async function createSession(input: CreateSessionInput) {

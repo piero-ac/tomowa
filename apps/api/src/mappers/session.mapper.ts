@@ -1,15 +1,27 @@
-import type { SelectSession } from "../db/schema.js";
+import type { SelectProfile, SelectSession } from "../db/schema.js";
 import type {
 	BookedSessionDto,
 	OwnedSessionDto,
 	SessionDto,
+	SessionWithOwnerDto,
 } from "../types/session.js";
+import { toPublicProfileSummaryDto } from "./profile.mapper.js";
 
 interface SessionDtoSource extends Omit<SelectSession, "meetingLink"> {
 	meetingLink?: string;
 }
 
-interface OwnedSessionDtoSource extends SelectSession {
+interface SessionWithOwnerDtoSource {
+	session: SessionDtoSource;
+	owner: SelectProfile;
+}
+
+interface FullSessionWithOwnerDtoSource {
+	session: SelectSession;
+	owner: SelectProfile;
+}
+
+interface OwnedSessionDtoSource extends FullSessionWithOwnerDtoSource {
 	pendingRequestCount: number;
 	approvedRequestCount: number;
 	declinedRequestCount: number;
@@ -40,25 +52,37 @@ export function toSessionDto(
 	};
 }
 
+export function toSessionWithOwnerDto(
+	source: SessionWithOwnerDtoSource,
+	includeMeetingLink = false,
+): SessionWithOwnerDto {
+	return {
+		...toSessionDto(source.session, includeMeetingLink),
+		owner: toPublicProfileSummaryDto(source.owner),
+	};
+}
+
 export function toOwnedSessionDto(
-	session: OwnedSessionDtoSource,
+	source: OwnedSessionDtoSource,
 ): OwnedSessionDto {
 	return {
-		...toSessionDto(session, true),
-		meetingLink: session.meetingLink,
+		...toSessionWithOwnerDto(source, true),
+		meetingLink: source.session.meetingLink,
 		requestSummary: {
-			pending: session.pendingRequestCount,
-			approved: session.approvedRequestCount,
-			declined: session.declinedRequestCount,
-			cancelled: session.cancelledRequestCount,
-			total: session.totalRequestCount,
+			pending: source.pendingRequestCount,
+			approved: source.approvedRequestCount,
+			declined: source.declinedRequestCount,
+			cancelled: source.cancelledRequestCount,
+			total: source.totalRequestCount,
 		},
 	};
 }
 
-export function toBookedSessionDto(session: SelectSession): BookedSessionDto {
+export function toBookedSessionDto(
+	source: FullSessionWithOwnerDtoSource,
+): BookedSessionDto {
 	return {
-		...toSessionDto(session, true),
-		meetingLink: session.meetingLink,
+		...toSessionWithOwnerDto(source, true),
+		meetingLink: source.session.meetingLink,
 	};
 }
