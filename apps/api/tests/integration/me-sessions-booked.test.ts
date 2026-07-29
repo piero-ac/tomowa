@@ -79,7 +79,10 @@ describe("GET /api/me/sessions-booked", () => {
 			.set("Authorization", `Bearer ${unrelatedToken}`);
 
 		expect(response.status).toBe(200);
-		expect(response.body).toEqual([]);
+		expect(response.body).toEqual({
+			items: [],
+			nextCursor: null,
+		});
 	});
 
 	it("returns future booked sessions to owners and approved requesters", async () => {
@@ -135,27 +138,28 @@ describe("GET /api/me/sessions-booked", () => {
 		expect(unrelatedResponse.status).toBe(200);
 
 		for (const response of [ownerResponse, requesterResponse]) {
-			expect(response.body).toHaveLength(2);
+			expect(response.body.items).toHaveLength(2);
+			expect(response.body.nextCursor).toBeNull();
 
 			expect(
-				response.body.map(
+				response.body.items.map(
 					(session: { sessionId: string }) => session.sessionId,
 				),
 			).toEqual([nearestSessionId, laterSessionId]);
 
-			expect(response.body[0]).toMatchObject({
+			expect(response.body.items[0]).toMatchObject({
 				sessionId: nearestSessionId,
 				status: "booked",
 				meetingLink: "https://example.test/nearest-booked",
 			});
 
-			expect(response.body[1]).toMatchObject({
+			expect(response.body.items[1]).toMatchObject({
 				sessionId: laterSessionId,
 				status: "booked",
 				meetingLink: "https://example.test/later-booked",
 			});
 
-			for (const session of response.body) {
+			for (const session of response.body.items) {
 				expect(session.owner).toEqual({
 					userId: session.ownerId,
 					displayName: "Session Owner",
@@ -171,14 +175,42 @@ describe("GET /api/me/sessions-booked", () => {
 			}
 		}
 
-		expect(unrelatedResponse.body).toEqual([]);
+		expect(unrelatedResponse.body).toEqual({
+			items: [],
+			nextCursor: null,
+		});
 
 		expect(
-			ownerResponse.body.some(
+			ownerResponse.body.items.some(
 				(session: { sessionId: string }) =>
 					session.sessionId === openSessionId ||
 					session.sessionId === pastSessionId,
 			),
 		).toBe(false);
+
+		for (const token of [ownerToken, approvedRequesterToken]) {
+			const firstPage = await request(app)
+				.get("/api/me/sessions-booked")
+				.query({ limit: 1 })
+				.set("Authorization", `Bearer ${token}`);
+
+			expect(firstPage.status).toBe(200);
+			expect(firstPage.body.items).toHaveLength(1);
+			expect(firstPage.body.items[0].sessionId).toBe(nearestSessionId);
+			expect(firstPage.body.nextCursor).toEqual(expect.any(String));
+
+			const secondPage = await request(app)
+				.get("/api/me/sessions-booked")
+				.query({
+					limit: 1,
+					cursor: firstPage.body.nextCursor,
+				})
+				.set("Authorization", `Bearer ${token}`);
+
+			expect(secondPage.status).toBe(200);
+			expect(secondPage.body.items).toHaveLength(1);
+			expect(secondPage.body.items[0].sessionId).toBe(laterSessionId);
+			expect(secondPage.body.nextCursor).toBeNull();
+		}
 	});
 });

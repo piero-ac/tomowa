@@ -51,11 +51,21 @@ export async function getOwnedSessions(
 	);
 }
 
-export async function getBookedSessionsForUser(userId: string) {
-	const bookedSessions =
-		await sessionRepository.getBookedSessionsForUser(userId);
+export async function getBookedSessionsForUser(
+	userId: string,
+	input: PaginationInput,
+) {
+	const rows = await sessionRepository.getBookedSessionsForUser(userId, input);
 
-	return bookedSessions.map((session) => toBookedSessionDto(session));
+	return buildPaginatedResponse(
+		rows,
+		input.limit,
+		(row) => toBookedSessionDto(row),
+		(row) => ({
+			sortValue: row.session.startsAt,
+			id: row.session.id,
+		}),
+	);
 }
 
 export async function getSessionById(sessionId: string, viewerId: string) {

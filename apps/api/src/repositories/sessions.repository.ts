@@ -108,7 +108,20 @@ export async function getOwnedSessions(
 		.limit(input.limit + 1);
 }
 
-export async function getBookedSessionsForUser(userId: string) {
+export async function getBookedSessionsForUser(
+	userId: string,
+	input: PaginationInput,
+) {
+	const cursorCondition = input.cursor
+		? or(
+				gt(sessions.startsAt, input.cursor.sortValue),
+				and(
+					eq(sessions.startsAt, input.cursor.sortValue),
+					gt(sessions.id, input.cursor.id),
+				),
+			)
+		: undefined;
+
 	return db
 		.select({
 			session: sessions,
@@ -131,9 +144,11 @@ export async function getBookedSessionsForUser(userId: string) {
 					eq(sessions.ownerId, userId),
 					eq(sessionRequests.requesterId, userId),
 				),
+				cursorCondition,
 			),
 		)
-		.orderBy(asc(sessions.startsAt), asc(sessions.id));
+		.orderBy(asc(sessions.startsAt), asc(sessions.id))
+		.limit(input.limit + 1);
 }
 
 export async function getSessionById(sessionId: string) {
