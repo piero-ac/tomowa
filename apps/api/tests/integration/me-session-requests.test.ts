@@ -61,7 +61,10 @@ describe("GET /api/me/session-requests", () => {
 			.set("Authorization", `Bearer ${otherToken}`);
 
 		expect(response.status).toBe(200);
-		expect(response.body).toEqual([]);
+		expect(response.body).toEqual({
+			items: [],
+			nextCursor: null,
+		});
 	});
 
 	it("returns only the user's requests with session details and correct privacy", async () => {
@@ -159,10 +162,11 @@ describe("GET /api/me/session-requests", () => {
 			.set("Authorization", `Bearer ${requesterToken}`);
 
 		expect(response.status).toBe(200);
-		expect(response.body).toHaveLength(4);
+		expect(response.body.items).toHaveLength(4);
+		expect(response.body.nextCursor).toBeNull();
 
 		expect(
-			response.body.map((item: { requestId: string }) => item.requestId),
+			response.body.items.map((item: { requestId: string }) => item.requestId),
 		).toEqual([
 			pendingResponse.body.requestId,
 			approvedResponse.body.requestId,
@@ -170,10 +174,10 @@ describe("GET /api/me/session-requests", () => {
 			cancelledResponse.body.requestId,
 		]);
 
-		const pendingRequest = response.body[0];
-		const approvedRequest = response.body[1];
-		const declinedRequest = response.body[2];
-		const cancelledRequest = response.body[3];
+		const pendingRequest = response.body.items[0];
+		const approvedRequest = response.body.items[1];
+		const declinedRequest = response.body.items[2];
+		const cancelledRequest = response.body.items[3];
 
 		expect(pendingRequest).toMatchObject({
 			status: "pending",
@@ -199,7 +203,7 @@ describe("GET /api/me/session-requests", () => {
 		expect(cancelledRequest.status).toBe("cancelled");
 		expect(cancelledRequest.session).not.toHaveProperty("meetingLink");
 
-		for (const requestItem of response.body) {
+		for (const requestItem of response.body.items) {
 			expect(requestItem.session.owner).toEqual({
 				userId: requestItem.session.ownerId,
 				displayName: "Session Owner",
@@ -213,5 +217,38 @@ describe("GET /api/me/session-requests", () => {
 			expect(requestItem.session.owner).not.toHaveProperty("timezone");
 			expect(requestItem.session.owner).not.toHaveProperty("createdAt");
 		}
+
+		const firstPage = await request(app)
+			.get("/api/me/session-requests")
+			.query({ limit: 2 })
+			.set("Authorization", `Bearer ${requesterToken}`);
+
+		expect(firstPage.status).toBe(200);
+		expect(
+			firstPage.body.items.map((item: { requestId: string }) => item.requestId),
+		).toEqual([
+			pendingResponse.body.requestId,
+			approvedResponse.body.requestId,
+		]);
+		expect(firstPage.body.nextCursor).toEqual(expect.any(String));
+
+		const secondPage = await request(app)
+			.get("/api/me/session-requests")
+			.query({
+				limit: 2,
+				cursor: firstPage.body.nextCursor,
+			})
+			.set("Authorization", `Bearer ${requesterToken}`);
+
+		expect(secondPage.status).toBe(200);
+		expect(
+			secondPage.body.items.map(
+				(item: { requestId: string }) => item.requestId,
+			),
+		).toEqual([
+			declinedResponse.body.requestId,
+			cancelledResponse.body.requestId,
+		]);
+		expect(secondPage.body.nextCursor).toBeNull();
 	});
 });

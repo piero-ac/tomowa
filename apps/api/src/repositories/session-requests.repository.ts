@@ -144,7 +144,20 @@ export async function getSessionRequests(
 		.limit(input.limit + 1);
 }
 
-export async function getUserSessionRequests(requesterId: string) {
+export async function getUserSessionRequests(
+	requesterId: string,
+	input: PaginationInput,
+) {
+	const cursorCondition = input.cursor
+		? or(
+				lt(sessionRequests.createdAt, input.cursor.sortValue),
+				and(
+					eq(sessionRequests.createdAt, input.cursor.sortValue),
+					lt(sessionRequests.id, input.cursor.id),
+				),
+			)
+		: undefined;
+
 	return db
 		.select({
 			request: sessionRequests,
@@ -154,8 +167,9 @@ export async function getUserSessionRequests(requesterId: string) {
 		.from(sessionRequests)
 		.innerJoin(sessions, eq(sessions.id, sessionRequests.sessionId))
 		.innerJoin(profiles, eq(profiles.id, sessions.ownerId))
-		.where(eq(sessionRequests.requesterId, requesterId))
-		.orderBy(desc(sessionRequests.createdAt), desc(sessionRequests.id));
+		.where(and(eq(sessionRequests.requesterId, requesterId), cursorCondition))
+		.orderBy(desc(sessionRequests.createdAt), desc(sessionRequests.id))
+		.limit(input.limit + 1);
 }
 
 export async function declineSessionRequest(

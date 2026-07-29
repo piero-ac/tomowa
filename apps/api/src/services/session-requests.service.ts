@@ -90,11 +90,24 @@ export async function getSessionRequests(
 	);
 }
 
-export async function getUserSessionRequests(requesterId: string) {
-	const requests =
-		await sessionRequestRepository.getUserSessionRequests(requesterId);
+export async function getUserSessionRequests(
+	requesterId: string,
+	input: PaginationInput,
+) {
+	const rows = await sessionRequestRepository.getUserSessionRequests(
+		requesterId,
+		input,
+	);
 
-	return requests.map((request) => toUserSessionRequestDto(request));
+	return buildPaginatedResponse(
+		rows,
+		input.limit,
+		(row) => toUserSessionRequestDto(row),
+		(row) => ({
+			sortValue: row.request.createdAt,
+			id: row.request.id,
+		}),
+	);
 }
 
 export async function declineSessionRequest(

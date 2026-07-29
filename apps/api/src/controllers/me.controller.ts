@@ -39,11 +39,25 @@ export async function getUserSessionRequests(req: Request, res: Response) {
 		throw new UnauthorizedError();
 	}
 
-	const requests = await sessionRequestService.getUserSessionRequests(
-		req.user.id,
-	);
+	const queryResult = paginationQuerySchema.safeParse(req.query);
 
-	res.status(200).json(requests);
+	if (!queryResult.success) {
+		throw new BadRequestError(
+			"Invalid query parameters.",
+			z.flattenError(queryResult.error),
+		);
+	}
+
+	const page = await sessionRequestService.getUserSessionRequests(req.user.id, {
+		limit: queryResult.data.limit,
+		...(queryResult.data.cursor
+			? {
+					cursor: decodeCursor(queryResult.data.cursor),
+				}
+			: {}),
+	});
+
+	res.status(200).json(page);
 }
 
 export async function getBookedSessions(req: Request, res: Response) {
