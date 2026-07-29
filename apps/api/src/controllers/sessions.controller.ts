@@ -1,16 +1,17 @@
 import { type Request, type Response } from "express";
 import {
 	createSessionSchema,
-	listSessionsQuerySchema,
 	sessionIdSchema,
 	updateSessionSchema,
 } from "../validation/session.schema.js";
 import { z } from "zod";
 import * as sessionService from "../services/sessions.service.js";
 import { BadRequestError, UnauthorizedError } from "../errors/index.js";
+import { decodeCursor } from "../lib/pagination.js";
+import { paginationQuerySchema } from "../validation/pagination.schema.js";
 
 export async function getSessions(req: Request, res: Response) {
-	const result = listSessionsQuerySchema.safeParse(req.query);
+	const result = paginationQuerySchema.safeParse(req.query);
 
 	if (!result.success) {
 		throw new BadRequestError(
@@ -19,9 +20,16 @@ export async function getSessions(req: Request, res: Response) {
 		);
 	}
 
-	const sessions = await sessionService.getSessions(result.data.limit);
+	const page = await sessionService.getSessions({
+		limit: result.data.limit,
+		...(result.data.cursor
+			? {
+					cursor: decodeCursor(result.data.cursor),
+				}
+			: {}),
+	});
 
-	res.status(200).json(sessions);
+	res.status(200).json(page);
 }
 
 export async function getSessionById(req: Request, res: Response) {

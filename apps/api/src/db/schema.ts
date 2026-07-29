@@ -94,6 +94,10 @@ export const sessions = pgTable(
 			table.startsAt,
 			table.id,
 		),
+
+		index("sessions_booked_starts_at_id_idx")
+			.on(table.startsAt, table.id)
+			.where(sql`${table.status} = 'booked'`),
 	],
 );
 
@@ -145,6 +149,18 @@ export const sessionRequests = pgTable(
 			table.requesterId,
 			table.status,
 			table.createdAt,
+		),
+
+		index("session_requests_session_created_at_id_idx").on(
+			table.sessionId,
+			table.createdAt,
+			table.id,
+		),
+
+		index("session_requests_requester_created_at_id_idx").on(
+			table.requesterId,
+			table.createdAt,
+			table.id,
 		),
 	],
 );

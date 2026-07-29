@@ -41,16 +41,5 @@ export const updateSessionSchema = createSessionSchema
 		message: "At least one field must be provided",
 	});
 
-export const listSessionsQuerySchema = z
-	.object({
-		limit: z.coerce
-			.number()
-			.int("Limit must be an integer")
-			.min(1, "Limit must be at least 1")
-			.max(50, "Limit cannot exceed 50")
-			.default(20),
-	})
-	.strict();
-
 export type CreateSessionBody = z.infer<typeof createSessionSchema>;
 export type UpdateSessionBody = z.infer<typeof updateSessionSchema>;

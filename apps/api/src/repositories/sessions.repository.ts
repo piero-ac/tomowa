@@ -1,10 +1,11 @@
-import { and, asc, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { profiles, sessionRequests, sessions } from "../db/schema.js";
 import type {
 	CreateSessionInput,
 	UpdateSessionInput,
 } from "../types/session.js";
+import type { PaginationInput } from "../types/pagination.js";
 
 export type DeleteOrCancelSessionResult =
 	| {
@@ -18,7 +19,17 @@ export type DeleteOrCancelSessionResult =
 				| "session_not_cancellable";
 	  };
 
-export async function getSessions(limit: number) {
+export async function getSessions(input: PaginationInput) {
+	const cursorCondition = input.cursor
+		? or(
+				gt(sessions.startsAt, input.cursor.sortValue),
+				and(
+					eq(sessions.startsAt, input.cursor.sortValue),
+					gt(sessions.id, input.cursor.id),
+				),
+			)
+		: undefined;
+
 	return db
 		.select({
 			session: {
@@ -39,12 +50,31 @@ export async function getSessions(limit: number) {
 		})
 		.from(sessions)
 		.innerJoin(profiles, eq(profiles.id, sessions.ownerId))
-		.where(and(eq(sessions.status, "open"), gte(sessions.startsAt, new Date())))
+		.where(
+			and(
+				eq(sessions.status, "open"),
+				gte(sessions.startsAt, new Date()),
+				cursorCondition,
+			),
+		)
 		.orderBy(asc(sessions.startsAt), asc(sessions.id))
-		.limit(limit);
+		.limit(input.limit + 1);
 }
 
-export async function getOwnedSessions(ownerId: string) {
+export async function getOwnedSessions(
+	ownerId: string,
+	input: PaginationInput,
+) {
+	const cursorCondition = input.cursor
+		? or(
+				lt(sessions.startsAt, input.cursor.sortValue),
+				and(
+					eq(sessions.startsAt, input.cursor.sortValue),
+					lt(sessions.id, input.cursor.id),
+				),
+			)
+		: undefined;
+
 	return db
 		.select({
 			session: sessions,
@@ -72,12 +102,26 @@ export async function getOwnedSessions(ownerId: string) {
 		.from(sessions)
 		.innerJoin(profiles, eq(profiles.id, sessions.ownerId))
 		.leftJoin(sessionRequests, eq(sessionRequests.sessionId, sessions.id))
-		.where(eq(sessions.ownerId, ownerId))
+		.where(and(eq(sessions.ownerId, ownerId), cursorCondition))
 		.groupBy(sessions.id, profiles.id)
-		.orderBy(desc(sessions.startsAt), desc(sessions.id));
+		.orderBy(desc(sessions.startsAt), desc(sessions.id))
+		.limit(input.limit + 1);
 }
 
-export async function getBookedSessionsForUser(userId: string) {
+export async function getBookedSessionsForUser(
+	userId: string,
+	input: PaginationInput,
+) {
+	const cursorCondition = input.cursor
+		? or(
+				gt(sessions.startsAt, input.cursor.sortValue),
+				and(
+					eq(sessions.startsAt, input.cursor.sortValue),
+					gt(sessions.id, input.cursor.id),
+				),
+			)
+		: undefined;
+
 	return db
 		.select({
 			session: sessions,
@@ -100,9 +144,11 @@ export async function getBookedSessionsForUser(userId: string) {
 					eq(sessions.ownerId, userId),
 					eq(sessionRequests.requesterId, userId),
 				),
+				cursorCondition,
 			),
 		)
-		.orderBy(asc(sessions.startsAt), asc(sessions.id));
+		.orderBy(asc(sessions.startsAt), asc(sessions.id))
+		.limit(input.limit + 1);
 }
 
 export async function getSessionById(sessionId: string) {

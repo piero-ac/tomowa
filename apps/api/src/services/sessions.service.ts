@@ -17,24 +17,55 @@ import {
 	toSessionWithOwnerDto,
 } from "../mappers/session.mapper.js";
 import { isPostgresUniqueViolation } from "../db/postgres-error.js";
+import { buildPaginatedResponse } from "../lib/pagination.js";
+import type { PaginationInput } from "../types/pagination.js";
 
-export async function getSessions(limit: number) {
-	const sessions = await sessionRepository.getSessions(limit);
+export async function getSessions(input: PaginationInput) {
+	const rows = await sessionRepository.getSessions(input);
 
-	return sessions.map((session) => toSessionWithOwnerDto(session));
+	return buildPaginatedResponse(
+		rows,
+		input.limit,
+		(row) => toSessionWithOwnerDto(row),
+		(row) => ({
+			sortValue: row.session.startsAt,
+			id: row.session.id,
+		}),
+	);
 }
 
-export async function getOwnedSessions(ownerId: string) {
-	const ownedSessions = await sessionRepository.getOwnedSessions(ownerId);
+export async function getOwnedSessions(
+	ownerId: string,
+	input: PaginationInput,
+) {
+	const rows = await sessionRepository.getOwnedSessions(ownerId, input);
 
-	return ownedSessions.map((session) => toOwnedSessionDto(session));
+	return buildPaginatedResponse(
+		rows,
+		input.limit,
+		(row) => toOwnedSessionDto(row),
+		(row) => ({
+			sortValue: row.session.startsAt,
+			id: row.session.id,
+		}),
+	);
 }
 
-export async function getBookedSessionsForUser(userId: string) {
-	const bookedSessions =
-		await sessionRepository.getBookedSessionsForUser(userId);
+export async function getBookedSessionsForUser(
+	userId: string,
+	input: PaginationInput,
+) {
+	const rows = await sessionRepository.getBookedSessionsForUser(userId, input);
 
-	return bookedSessions.map((session) => toBookedSessionDto(session));
+	return buildPaginatedResponse(
+		rows,
+		input.limit,
+		(row) => toBookedSessionDto(row),
+		(row) => ({
+			sortValue: row.session.startsAt,
+			id: row.session.id,
+		}),
+	);
 }
 
 export async function getSessionById(sessionId: string, viewerId: string) {

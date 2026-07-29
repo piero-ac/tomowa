@@ -12,6 +12,8 @@ import {
 import * as sessionRequestRepository from "../repositories/session-requests.repository.js";
 import * as sessionRepository from "../repositories/sessions.repository.js";
 import type { CreateSessionRequestInput } from "../types/session-request.js";
+import { buildPaginatedResponse } from "../lib/pagination.js";
+import type { PaginationInput } from "../types/pagination.js";
 
 export async function createSessionRequest(input: CreateSessionRequestInput) {
 	try {
@@ -57,7 +59,11 @@ export async function createSessionRequest(input: CreateSessionRequestInput) {
 	}
 }
 
-export async function getSessionRequests(sessionId: string, ownerId: string) {
+export async function getSessionRequests(
+	sessionId: string,
+	ownerId: string,
+	input: PaginationInput,
+) {
 	const session = await sessionRepository.getSessionById(sessionId);
 
 	if (!session) {
@@ -68,16 +74,40 @@ export async function getSessionRequests(sessionId: string, ownerId: string) {
 		throw new ForbiddenError("Only the session owner can view its requests.");
 	}
 
-	const requests = await sessionRequestRepository.getSessionRequests(sessionId);
+	const rows = await sessionRequestRepository.getSessionRequests(
+		sessionId,
+		input,
+	);
 
-	return requests.map((request) => toSessionRequestWithRequesterDto(request));
+	return buildPaginatedResponse(
+		rows,
+		input.limit,
+		(row) => toSessionRequestWithRequesterDto(row),
+		(row) => ({
+			sortValue: row.request.createdAt,
+			id: row.request.id,
+		}),
+	);
 }
 
-export async function getUserSessionRequests(requesterId: string) {
-	const requests =
-		await sessionRequestRepository.getUserSessionRequests(requesterId);
+export async function getUserSessionRequests(
+	requesterId: string,
+	input: PaginationInput,
+) {
+	const rows = await sessionRequestRepository.getUserSessionRequests(
+		requesterId,
+		input,
+	);
 
-	return requests.map((request) => toUserSessionRequestDto(request));
+	return buildPaginatedResponse(
+		rows,
+		input.limit,
+		(row) => toUserSessionRequestDto(row),
+		(row) => ({
+			sortValue: row.request.createdAt,
+			id: row.request.id,
+		}),
+	);
 }
 
 export async function declineSessionRequest(

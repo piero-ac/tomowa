@@ -87,6 +87,18 @@ describe("API error handling", () => {
 		expect(response.body.message).toBe("Invalid query parameters.");
 	});
 
+	it("rejects an invalid pagination cursor", async () => {
+		const response = await request(app)
+			.get("/api/sessions")
+			.query({ cursor: "not-a-valid-cursor" })
+			.set("Authorization", `Bearer ${ownerToken}`);
+
+		expect(response.status).toBe(400);
+		expect(response.body).toEqual({
+			message: "Invalid pagination cursor.",
+		});
+	});
+
 	it("returns 404 for an unknown route", async () => {
 		const response = await request(app).get("/route-that-does-not-exist");
 
