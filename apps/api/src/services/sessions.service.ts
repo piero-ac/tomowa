@@ -17,11 +17,21 @@ import {
 	toSessionWithOwnerDto,
 } from "../mappers/session.mapper.js";
 import { isPostgresUniqueViolation } from "../db/postgres-error.js";
+import { buildPaginatedResponse } from "../lib/pagination.js";
+import type { PaginationInput } from "../types/pagination.js";
 
-export async function getSessions(limit: number) {
-	const sessions = await sessionRepository.getSessions(limit);
+export async function getSessions(input: PaginationInput) {
+	const rows = await sessionRepository.getSessions(input);
 
-	return sessions.map((session) => toSessionWithOwnerDto(session));
+	return buildPaginatedResponse(
+		rows,
+		input.limit,
+		(row) => toSessionWithOwnerDto(row),
+		(row) => ({
+			sortValue: row.session.startsAt,
+			id: row.session.id,
+		}),
+	);
 }
 
 export async function getOwnedSessions(ownerId: string) {

@@ -25,10 +25,11 @@ describe("GET /api/sessions", () => {
 			.set("Authorization", `Bearer ${requesterToken}`);
 
 		expect(response.status).toBe(200);
-		expect(Array.isArray(response.body)).toBe(true);
-		expect(response.body.length).toBeGreaterThanOrEqual(2);
+		expect(Array.isArray(response.body.items)).toBe(true);
+		expect(response.body.items.length).toBeGreaterThanOrEqual(2);
+		expect(response.body).toHaveProperty("nextCursor");
 
-		for (const session of response.body) {
+		for (const session of response.body.items) {
 			expect(session).not.toHaveProperty("meetingLink");
 
 			expect(session.owner).toEqual({
@@ -44,6 +45,31 @@ describe("GET /api/sessions", () => {
 			expect(session.owner).not.toHaveProperty("timezone");
 			expect(session.owner).not.toHaveProperty("createdAt");
 		}
+	});
+
+	it("paginates sessions without returning duplicates", async () => {
+		const firstPage = await request(app)
+			.get("/api/sessions")
+			.query({ limit: 1 })
+			.set("Authorization", `Bearer ${requesterToken}`);
+
+		expect(firstPage.status).toBe(200);
+		expect(firstPage.body.items).toHaveLength(1);
+		expect(firstPage.body.nextCursor).toEqual(expect.any(String));
+
+		const secondPage = await request(app)
+			.get("/api/sessions")
+			.query({
+				limit: 1,
+				cursor: firstPage.body.nextCursor,
+			})
+			.set("Authorization", `Bearer ${requesterToken}`);
+
+		expect(secondPage.status).toBe(200);
+		expect(secondPage.body.items).toHaveLength(1);
+		expect(secondPage.body.items[0].sessionId).not.toBe(
+			firstPage.body.items[0].sessionId,
+		);
 	});
 });
 
