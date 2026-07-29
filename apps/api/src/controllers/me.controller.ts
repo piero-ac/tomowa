@@ -5,15 +5,33 @@ import { updateProfileSchema } from "../validation/profile.schema.js";
 import * as sessionService from "../services/sessions.service.js";
 import * as sessionRequestService from "../services/session-requests.service.js";
 import * as profileService from "../services/profiles.service.js";
+import { decodeCursor } from "../lib/pagination.js";
+import { paginationQuerySchema } from "../validation/pagination.schema.js";
 
 export async function getCreatedSessions(req: Request, res: Response) {
 	if (!req.user) {
 		throw new UnauthorizedError();
 	}
 
-	const sessions = await sessionService.getOwnedSessions(req.user.id);
+	const queryResult = paginationQuerySchema.safeParse(req.query);
 
-	res.status(200).json(sessions);
+	if (!queryResult.success) {
+		throw new BadRequestError(
+			"Invalid query parameters.",
+			z.flattenError(queryResult.error),
+		);
+	}
+
+	const page = await sessionService.getOwnedSessions(req.user.id, {
+		limit: queryResult.data.limit,
+		...(queryResult.data.cursor
+			? {
+					cursor: decodeCursor(queryResult.data.cursor),
+				}
+			: {}),
+	});
+
+	res.status(200).json(page);
 }
 
 export async function getUserSessionRequests(req: Request, res: Response) {

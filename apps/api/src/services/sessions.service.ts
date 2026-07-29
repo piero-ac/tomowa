@@ -34,10 +34,21 @@ export async function getSessions(input: PaginationInput) {
 	);
 }
 
-export async function getOwnedSessions(ownerId: string) {
-	const ownedSessions = await sessionRepository.getOwnedSessions(ownerId);
+export async function getOwnedSessions(
+	ownerId: string,
+	input: PaginationInput,
+) {
+	const rows = await sessionRepository.getOwnedSessions(ownerId, input);
 
-	return ownedSessions.map((session) => toOwnedSessionDto(session));
+	return buildPaginatedResponse(
+		rows,
+		input.limit,
+		(row) => toOwnedSessionDto(row),
+		(row) => ({
+			sortValue: row.session.startsAt,
+			id: row.session.id,
+		}),
+	);
 }
 
 export async function getBookedSessionsForUser(userId: string) {

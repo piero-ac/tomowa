@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { profiles, sessionRequests, sessions } from "../db/schema.js";
 import type {
@@ -61,7 +61,20 @@ export async function getSessions(input: PaginationInput) {
 		.limit(input.limit + 1);
 }
 
-export async function getOwnedSessions(ownerId: string) {
+export async function getOwnedSessions(
+	ownerId: string,
+	input: PaginationInput,
+) {
+	const cursorCondition = input.cursor
+		? or(
+				lt(sessions.startsAt, input.cursor.sortValue),
+				and(
+					eq(sessions.startsAt, input.cursor.sortValue),
+					lt(sessions.id, input.cursor.id),
+				),
+			)
+		: undefined;
+
 	return db
 		.select({
 			session: sessions,
@@ -89,9 +102,10 @@ export async function getOwnedSessions(ownerId: string) {
 		.from(sessions)
 		.innerJoin(profiles, eq(profiles.id, sessions.ownerId))
 		.leftJoin(sessionRequests, eq(sessionRequests.sessionId, sessions.id))
-		.where(eq(sessions.ownerId, ownerId))
+		.where(and(eq(sessions.ownerId, ownerId), cursorCondition))
 		.groupBy(sessions.id, profiles.id)
-		.orderBy(desc(sessions.startsAt), desc(sessions.id));
+		.orderBy(desc(sessions.startsAt), desc(sessions.id))
+		.limit(input.limit + 1);
 }
 
 export async function getBookedSessionsForUser(userId: string) {

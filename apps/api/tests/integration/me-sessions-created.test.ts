@@ -35,7 +35,10 @@ describe("GET /api/me/sessions-created", () => {
 			.set("Authorization", `Bearer ${dashboardOwnerToken}`);
 
 		expect(response.status).toBe(200);
-		expect(response.body).toEqual([]);
+		expect(response.body).toEqual({
+			items: [],
+			nextCursor: null,
+		});
 	});
 
 	it("returns owned sessions with meeting links and request summaries", async () => {
@@ -132,9 +135,10 @@ describe("GET /api/me/sessions-created", () => {
 			.set("Authorization", `Bearer ${dashboardOwnerToken}`);
 
 		expect(response.status).toBe(200);
-		expect(response.body).toHaveLength(2);
+		expect(response.body.items).toHaveLength(2);
+		expect(response.body.nextCursor).toBeNull();
 
-		expect(response.body[0]).toMatchObject({
+		expect(response.body.items[0]).toMatchObject({
 			sessionId: secondSessionId,
 			meetingLink: "https://example.test/second-owned",
 			requestSummary: {
@@ -146,7 +150,7 @@ describe("GET /api/me/sessions-created", () => {
 			},
 		});
 
-		expect(response.body[1]).toMatchObject({
+		expect(response.body.items[1]).toMatchObject({
 			sessionId: firstSessionId,
 			meetingLink: "https://example.test/first-owned",
 			requestSummary: {
@@ -158,7 +162,7 @@ describe("GET /api/me/sessions-created", () => {
 			},
 		});
 
-		for (const session of response.body) {
+		for (const session of response.body.items) {
 			expect(session.owner).toEqual({
 				userId: session.ownerId,
 				displayName: "Other User",
@@ -172,5 +176,28 @@ describe("GET /api/me/sessions-created", () => {
 			expect(session.owner).not.toHaveProperty("timezone");
 			expect(session.owner).not.toHaveProperty("createdAt");
 		}
+
+		const firstPage = await request(app)
+			.get("/api/me/sessions-created")
+			.query({ limit: 1 })
+			.set("Authorization", `Bearer ${dashboardOwnerToken}`);
+
+		expect(firstPage.status).toBe(200);
+		expect(firstPage.body.items).toHaveLength(1);
+		expect(firstPage.body.items[0].sessionId).toBe(secondSessionId);
+		expect(firstPage.body.nextCursor).toEqual(expect.any(String));
+
+		const secondPage = await request(app)
+			.get("/api/me/sessions-created")
+			.query({
+				limit: 1,
+				cursor: firstPage.body.nextCursor,
+			})
+			.set("Authorization", `Bearer ${dashboardOwnerToken}`);
+
+		expect(secondPage.status).toBe(200);
+		expect(secondPage.body.items).toHaveLength(1);
+		expect(secondPage.body.items[0].sessionId).toBe(firstSessionId);
+		expect(secondPage.body.nextCursor).toBeNull();
 	});
 });
