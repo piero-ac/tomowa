@@ -54,7 +54,10 @@ describe("GET /api/sessions/:sessionId/requests", () => {
 			.set("Authorization", `Bearer ${ownerToken}`);
 
 		expect(response.status).toBe(200);
-		expect(response.body).toEqual([]);
+		expect(response.body).toEqual({
+			items: [],
+			nextCursor: null,
+		});
 	});
 
 	it("prevents a non-owner from viewing the requests", async () => {
@@ -116,13 +119,14 @@ describe("GET /api/sessions/:sessionId/requests", () => {
 			.set("Authorization", `Bearer ${ownerToken}`);
 
 		expect(response.status).toBe(200);
-		expect(response.body).toHaveLength(2);
+		expect(response.body.items).toHaveLength(2);
+		expect(response.body.nextCursor).toBeNull();
 		expect(
-			response.body.map((item: { requestId: string }) => item.requestId),
+			response.body.items.map((item: { requestId: string }) => item.requestId),
 		).toEqual([newerResponse.body.requestId, olderResponse.body.requestId]);
 
-		expect(response.body[0].requester).toEqual({
-			userId: response.body[0].requesterId,
+		expect(response.body.items[0].requester).toEqual({
+			userId: response.body.items[0].requesterId,
 			displayName: "Other User",
 			username: null,
 			avatarKey: null,
@@ -130,8 +134,8 @@ describe("GET /api/sessions/:sessionId/requests", () => {
 			learningLanguage: null,
 		});
 
-		expect(response.body[1].requester).toEqual({
-			userId: response.body[1].requesterId,
+		expect(response.body.items[1].requester).toEqual({
+			userId: response.body.items[1].requesterId,
 			displayName: "Session Requester",
 			username: null,
 			avatarKey: null,
@@ -139,10 +143,37 @@ describe("GET /api/sessions/:sessionId/requests", () => {
 			learningLanguage: null,
 		});
 
-		for (const item of response.body) {
+		for (const item of response.body.items) {
 			expect(item.requester).not.toHaveProperty("bio");
 			expect(item.requester).not.toHaveProperty("timezone");
 			expect(item.requester).not.toHaveProperty("createdAt");
 		}
+
+		const firstPage = await request(app)
+			.get(`/api/sessions/${sessionId}/requests`)
+			.query({ limit: 1 })
+			.set("Authorization", `Bearer ${ownerToken}`);
+
+		expect(firstPage.status).toBe(200);
+		expect(firstPage.body.items).toHaveLength(1);
+		expect(firstPage.body.items[0].requestId).toBe(
+			newerResponse.body.requestId,
+		);
+		expect(firstPage.body.nextCursor).toEqual(expect.any(String));
+
+		const secondPage = await request(app)
+			.get(`/api/sessions/${sessionId}/requests`)
+			.query({
+				limit: 1,
+				cursor: firstPage.body.nextCursor,
+			})
+			.set("Authorization", `Bearer ${ownerToken}`);
+
+		expect(secondPage.status).toBe(200);
+		expect(secondPage.body.items).toHaveLength(1);
+		expect(secondPage.body.items[0].requestId).toBe(
+			olderResponse.body.requestId,
+		);
+		expect(secondPage.body.nextCursor).toBeNull();
 	});
 });

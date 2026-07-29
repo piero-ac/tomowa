@@ -8,6 +8,8 @@ import {
 	createSessionRequestSchema,
 	sessionRequestParamsSchema,
 } from "../validation/session-request.schema.js";
+import { decodeCursor } from "../lib/pagination.js";
+import { paginationQuerySchema } from "../validation/pagination.schema.js";
 
 export async function createSessionRequest(req: Request, res: Response) {
 	if (!req.user) {
@@ -55,12 +57,29 @@ export async function getSessionRequests(req: Request, res: Response) {
 		);
 	}
 
-	const requests = await sessionRequestService.getSessionRequests(
+	const queryResult = paginationQuerySchema.safeParse(req.query);
+
+	if (!queryResult.success) {
+		throw new BadRequestError(
+			"Invalid query parameters.",
+			z.flattenError(queryResult.error),
+		);
+	}
+
+	const page = await sessionRequestService.getSessionRequests(
 		paramsResult.data.sessionId,
 		req.user.id,
+		{
+			limit: queryResult.data.limit,
+			...(queryResult.data.cursor
+				? {
+						cursor: decodeCursor(queryResult.data.cursor),
+					}
+				: {}),
+		},
 	);
 
-	res.status(200).json(requests);
+	res.status(200).json(page);
 }
 
 export async function declineSessionRequest(req: Request, res: Response) {

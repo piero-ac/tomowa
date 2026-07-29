@@ -1,8 +1,9 @@
 import { db } from "../db/index.js";
 import { profiles, sessionRequests, sessions } from "../db/schema.js";
 import type { CreateSessionRequestInput } from "../types/session-request.js";
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, lt, ne, or } from "drizzle-orm";
 import type { SelectSessionRequest } from "../db/schema.js";
+import type { PaginationInput } from "../types/pagination.js";
 
 export type ApproveSessionRequestResult =
 	| {
@@ -117,7 +118,20 @@ export async function getSessionRequest(sessionId: string, requestId: string) {
 	return request ?? null;
 }
 
-export async function getSessionRequests(sessionId: string) {
+export async function getSessionRequests(
+	sessionId: string,
+	input: PaginationInput,
+) {
+	const cursorCondition = input.cursor
+		? or(
+				lt(sessionRequests.createdAt, input.cursor.sortValue),
+				and(
+					eq(sessionRequests.createdAt, input.cursor.sortValue),
+					lt(sessionRequests.id, input.cursor.id),
+				),
+			)
+		: undefined;
+
 	return db
 		.select({
 			request: sessionRequests,
@@ -125,8 +139,9 @@ export async function getSessionRequests(sessionId: string) {
 		})
 		.from(sessionRequests)
 		.innerJoin(profiles, eq(profiles.id, sessionRequests.requesterId))
-		.where(eq(sessionRequests.sessionId, sessionId))
-		.orderBy(desc(sessionRequests.createdAt), desc(sessionRequests.id));
+		.where(and(eq(sessionRequests.sessionId, sessionId), cursorCondition))
+		.orderBy(desc(sessionRequests.createdAt), desc(sessionRequests.id))
+		.limit(input.limit + 1);
 }
 
 export async function getUserSessionRequests(requesterId: string) {
