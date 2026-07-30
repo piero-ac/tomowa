@@ -4,6 +4,7 @@ import {
 	profiles,
 	sessionRequests,
 	sessions,
+	type SelectProfile,
 	type SelectSession,
 } from "../db/schema.js";
 import type {
@@ -169,7 +170,9 @@ export async function getSessionById(
 	return session ?? null;
 }
 
-export async function getSessionWithOwnerById(sessionId: string) {
+export async function getSessionWithOwnerById(
+	sessionId: string,
+): Promise<{ session: SelectSession; owner: SelectProfile } | null> {
 	const [result] = await db
 		.select({
 			session: sessions,

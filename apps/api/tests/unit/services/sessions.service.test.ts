@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { SelectSession } from "../../../src/db/schema.js";
+import type { SelectProfile, SelectSession } from "../../../src/db/schema.js";
+import { decodeCursor } from "../../../src/lib/pagination.js";
 import * as sessionRepository from "../../../src/repositories/sessions.repository.js";
 import * as sessionService from "../../../src/services/sessions.service.js";
 import type { CreateSessionInput } from "../../../src/types/session.js";
@@ -19,7 +20,9 @@ vi.mock("../../../src/repositories/sessions.repository.js", () => ({
 
 const ownerId = "10000000-0000-4000-8000-000000000001";
 const otherUserId = "10000000-0000-4000-8000-000000000002";
+const unrelatedUserId = "10000000-0000-4000-8000-000000000003";
 const sessionId = "20000000-0000-4000-8000-000000000001";
+const secondSessionId = "20000000-0000-4000-8000-000000000002";
 
 const validCreateInput: CreateSessionInput = {
 	ownerId,
@@ -42,6 +45,45 @@ const existingSession: SelectSession = {
 	updatedAt: new Date("2026-01-02T00:00:00.000Z"),
 };
 
+const publicSession: Omit<SelectSession, "meetingLink"> = {
+	id: existingSession.id,
+	ownerId: existingSession.ownerId,
+	title: existingSession.title,
+	targetLanguage: existingSession.targetLanguage,
+	helpLanguage: existingSession.helpLanguage,
+	startsAt: existingSession.startsAt,
+	durationMinutes: existingSession.durationMinutes,
+	status: existingSession.status,
+	imageKey: existingSession.imageKey,
+	description: existingSession.description,
+	createdAt: existingSession.createdAt,
+	updatedAt: existingSession.updatedAt,
+};
+
+const ownerProfile: SelectProfile = {
+	id: ownerId,
+	displayName: "Session Owner",
+	username: "session_owner",
+	bio: null,
+	avatarKey: null,
+	nativeLanguage: "English",
+	learningLanguage: "Japanese",
+	timezone: "America/New_York",
+	createdAt: new Date("2026-01-01T00:00:00.000Z"),
+	updatedAt: new Date("2026-01-02T00:00:00.000Z"),
+};
+
+const getSessionsMock = vi.mocked(sessionRepository.getSessions);
+const getOwnedSessionsMock = vi.mocked(sessionRepository.getOwnedSessions);
+const getBookedSessionsForUserMock = vi.mocked(
+	sessionRepository.getBookedSessionsForUser,
+);
+const getSessionWithOwnerByIdMock = vi.mocked(
+	sessionRepository.getSessionWithOwnerById,
+);
+const isApprovedRequesterMock = vi.mocked(
+	sessionRepository.isApprovedRequester,
+);
 const createSessionMock = vi.mocked(sessionRepository.createSession);
 const getSessionByIdMock = vi.mocked(sessionRepository.getSessionById);
 const updateSessionMock = vi.mocked(sessionRepository.updateSession);
@@ -51,6 +93,184 @@ const deleteOrCancelSessionMock = vi.mocked(
 
 beforeEach(() => {
 	vi.resetAllMocks();
+});
+
+describe("session reads", () => {
+	it("maps and paginates public sessions without exposing meeting links", async () => {
+		const input = { limit: 1 };
+		const secondSession = {
+			...publicSession,
+			id: secondSessionId,
+			startsAt: new Date("2030-01-16T18:00:00.000Z"),
+		};
+
+		getSessionsMock.mockResolvedValue([
+			{
+				session: publicSession,
+				owner: ownerProfile,
+			},
+			{
+				session: secondSession,
+				owner: ownerProfile,
+			},
+		]);
+
+		const page = await sessionService.getSessions(input);
+
+		expect(page.items).toHaveLength(1);
+		expect(page.items[0]).toMatchObject({
+			sessionId,
+			ownerId,
+			owner: {
+				userId: ownerId,
+				displayName: "Session Owner",
+			},
+		});
+		expect(page.items[0]).not.toHaveProperty("meetingLink");
+		expect(page.nextCursor).toEqual(expect.any(String));
+
+		if (!page.nextCursor) {
+			throw new Error("Expected a next cursor.");
+		}
+
+		expect(decodeCursor(page.nextCursor)).toEqual({
+			sortValue: publicSession.startsAt,
+			id: sessionId,
+		});
+		expect(getSessionsMock).toHaveBeenCalledWith(input);
+	});
+
+	it("maps owned sessions with meeting links and request summaries", async () => {
+		const input = { limit: 20 };
+
+		getOwnedSessionsMock.mockResolvedValue([
+			{
+				session: existingSession,
+				owner: ownerProfile,
+				pendingRequestCount: 2,
+				approvedRequestCount: 1,
+				declinedRequestCount: 3,
+				cancelledRequestCount: 4,
+				totalRequestCount: 10,
+			},
+		]);
+
+		const page = await sessionService.getOwnedSessions(ownerId, input);
+
+		expect(page).toMatchObject({
+			items: [
+				{
+					sessionId,
+					meetingLink: "https://example.test/meeting",
+					requestSummary: {
+						pending: 2,
+						approved: 1,
+						declined: 3,
+						cancelled: 4,
+						total: 10,
+					},
+				},
+			],
+			nextCursor: null,
+		});
+		expect(getOwnedSessionsMock).toHaveBeenCalledWith(ownerId, input);
+	});
+
+	it("maps booked sessions with their meeting links", async () => {
+		const input = { limit: 20 };
+
+		getBookedSessionsForUserMock.mockResolvedValue([
+			{
+				session: {
+					...existingSession,
+					status: "booked",
+				},
+				owner: ownerProfile,
+			},
+		]);
+
+		const page = await sessionService.getBookedSessionsForUser(
+			otherUserId,
+			input,
+		);
+
+		expect(page).toMatchObject({
+			items: [
+				{
+					sessionId,
+					status: "booked",
+					meetingLink: "https://example.test/meeting",
+				},
+			],
+			nextCursor: null,
+		});
+		expect(getBookedSessionsForUserMock).toHaveBeenCalledWith(
+			otherUserId,
+			input,
+		);
+	});
+});
+
+describe("getSessionById", () => {
+	it("throws not found when the session does not exist", async () => {
+		getSessionWithOwnerByIdMock.mockResolvedValue(null);
+
+		await expect(
+			sessionService.getSessionById(sessionId, otherUserId),
+		).rejects.toMatchObject({
+			name: "NotFoundError",
+			statusCode: 404,
+			message: "Session not found.",
+		});
+		expect(isApprovedRequesterMock).not.toHaveBeenCalled();
+	});
+
+	it("shows the meeting link to the session owner", async () => {
+		getSessionWithOwnerByIdMock.mockResolvedValue({
+			session: existingSession,
+			owner: ownerProfile,
+		});
+
+		const result = await sessionService.getSessionById(sessionId, ownerId);
+
+		expect(result.meetingLink).toBe("https://example.test/meeting");
+		expect(isApprovedRequesterMock).not.toHaveBeenCalled();
+	});
+
+	it("shows the meeting link to the approved requester", async () => {
+		getSessionWithOwnerByIdMock.mockResolvedValue({
+			session: existingSession,
+			owner: ownerProfile,
+		});
+		isApprovedRequesterMock.mockResolvedValue(true);
+
+		const result = await sessionService.getSessionById(sessionId, otherUserId);
+
+		expect(result.meetingLink).toBe("https://example.test/meeting");
+		expect(isApprovedRequesterMock).toHaveBeenCalledWith(
+			sessionId,
+			otherUserId,
+		);
+	});
+
+	it("hides the meeting link from an unrelated user", async () => {
+		getSessionWithOwnerByIdMock.mockResolvedValue({
+			session: existingSession,
+			owner: ownerProfile,
+		});
+		isApprovedRequesterMock.mockResolvedValue(false);
+
+		const result = await sessionService.getSessionById(
+			sessionId,
+			unrelatedUserId,
+		);
+
+		expect(result).not.toHaveProperty("meetingLink");
+		expect(isApprovedRequesterMock).toHaveBeenCalledWith(
+			sessionId,
+			unrelatedUserId,
+		);
+	});
 });
 
 describe("createSession", () => {
