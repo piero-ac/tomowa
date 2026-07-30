@@ -45,6 +45,9 @@ const existingSession: SelectSession = {
 const createSessionMock = vi.mocked(sessionRepository.createSession);
 const getSessionByIdMock = vi.mocked(sessionRepository.getSessionById);
 const updateSessionMock = vi.mocked(sessionRepository.updateSession);
+const deleteOrCancelSessionMock = vi.mocked(
+	sessionRepository.deleteOrCancelSession,
+);
 
 beforeEach(() => {
 	vi.resetAllMocks();
@@ -279,5 +282,91 @@ describe("updateSession", () => {
 				title: "Updated title",
 			}),
 		).rejects.toBe(repositoryError);
+	});
+});
+
+describe("deleteSession", () => {
+	it.each(["deleted", "cancelled"] as const)(
+		"completes successfully when the repository outcome is %s",
+		async (outcome) => {
+			deleteOrCancelSessionMock.mockResolvedValue({ outcome });
+
+			await expect(
+				sessionService.deleteSession(sessionId, ownerId),
+			).resolves.toBeUndefined();
+			expect(deleteOrCancelSessionMock).toHaveBeenCalledOnce();
+			expect(deleteOrCancelSessionMock).toHaveBeenCalledWith(
+				sessionId,
+				ownerId,
+			);
+		},
+	);
+
+	it("throws not found when the session does not exist", async () => {
+		deleteOrCancelSessionMock.mockResolvedValue({
+			outcome: "session_not_found",
+		});
+
+		await expect(
+			sessionService.deleteSession(sessionId, ownerId),
+		).rejects.toMatchObject({
+			name: "NotFoundError",
+			statusCode: 404,
+			message: "Session not found.",
+		});
+	});
+
+	it("prevents a non-owner from deleting or cancelling the session", async () => {
+		deleteOrCancelSessionMock.mockResolvedValue({
+			outcome: "forbidden",
+		});
+
+		await expect(
+			sessionService.deleteSession(sessionId, otherUserId),
+		).rejects.toMatchObject({
+			name: "ForbiddenError",
+			statusCode: 403,
+			message: "Only the session owner can delete or cancel it.",
+		});
+	});
+
+	it("prevents cancelling a session that has started", async () => {
+		deleteOrCancelSessionMock.mockResolvedValue({
+			outcome: "session_started",
+		});
+
+		await expect(
+			sessionService.deleteSession(sessionId, ownerId),
+		).rejects.toMatchObject({
+			name: "ConflictError",
+			statusCode: 409,
+			message: "Started sessions cannot be cancelled.",
+		});
+	});
+
+	it("prevents cancelling a completed or cancelled session", async () => {
+		deleteOrCancelSessionMock.mockResolvedValue({
+			outcome: "session_not_cancellable",
+		});
+
+		await expect(
+			sessionService.deleteSession(sessionId, ownerId),
+		).rejects.toMatchObject({
+			name: "ConflictError",
+			statusCode: 409,
+			message: "Completed or cancelled sessions cannot be cancelled.",
+		});
+	});
+
+	it("rejects an unexpected repository outcome", async () => {
+		deleteOrCancelSessionMock.mockResolvedValue({
+			outcome: "unexpected",
+		} as never);
+
+		await expect(
+			sessionService.deleteSession(sessionId, ownerId),
+		).rejects.toThrow(
+			'Unhandled session cancellation result: {"outcome":"unexpected"}',
+		);
 	});
 });
