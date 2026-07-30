@@ -1,4 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	afterAll,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest";
 
 import type { SelectProfile, SelectSession } from "../../../src/db/schema.js";
 import { decodeCursor } from "../../../src/lib/pagination.js";
@@ -91,8 +99,17 @@ const deleteOrCancelSessionMock = vi.mocked(
 	sessionRepository.deleteOrCancelSession,
 );
 
+beforeAll(() => {
+	vi.useFakeTimers();
+	vi.setSystemTime(new Date("2026-07-30T12:00:00.000Z"));
+});
+
 beforeEach(() => {
 	vi.resetAllMocks();
+});
+
+afterAll(() => {
+	vi.useRealTimers();
 });
 
 describe("session reads", () => {
