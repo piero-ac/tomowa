@@ -25,9 +25,7 @@ describe("pagination cursors", () => {
 	});
 
 	it("rejects a malformed cursor", () => {
-		expect(() => decodeCursor("not-a-valid-cursor")).toThrow(
-			BadRequestError,
-		);
+		expect(() => decodeCursor("not-a-valid-cursor")).toThrow(BadRequestError);
 		expect(() => decodeCursor("not-a-valid-cursor")).toThrow(
 			"Invalid pagination cursor.",
 		);
