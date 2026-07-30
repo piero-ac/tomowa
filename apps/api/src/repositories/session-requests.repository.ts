@@ -103,7 +103,10 @@ export async function createSessionRequest(
 	});
 }
 
-export async function getSessionRequest(sessionId: string, requestId: string) {
+export async function getSessionRequest(
+	sessionId: string,
+	requestId: string,
+): Promise<SelectSessionRequest | null> {
 	const [request] = await db
 		.select()
 		.from(sessionRequests)
@@ -175,7 +178,7 @@ export async function getUserSessionRequests(
 export async function declineSessionRequest(
 	sessionId: string,
 	requestId: string,
-) {
+): Promise<SelectSessionRequest | null> {
 	const now = new Date();
 
 	const [declinedRequest] = await db
@@ -201,7 +204,7 @@ export async function cancelPendingSessionRequest(
 	sessionId: string,
 	requestId: string,
 	requesterId: string,
-) {
+): Promise<SelectSessionRequest | null> {
 	const [cancelledRequest] = await db
 		.update(sessionRequests)
 		.set({

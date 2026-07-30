@@ -1,9 +1,11 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { profiles } from "../db/schema.js";
+import { profiles, type SelectProfile } from "../db/schema.js";
 import type { UpdateProfileInput } from "../types/profile.js";
 
-export async function getProfileByUserId(userId: string) {
+export async function getProfileByUserId(
+	userId: string,
+): Promise<SelectProfile | null> {
 	const [profile] = await db
 		.select()
 		.from(profiles)
@@ -13,7 +15,10 @@ export async function getProfileByUserId(userId: string) {
 	return profile ?? null;
 }
 
-export async function updateProfile(userId: string, input: UpdateProfileInput) {
+export async function updateProfile(
+	userId: string,
+	input: UpdateProfileInput,
+): Promise<SelectProfile | null> {
 	const [updatedProfile] = await db
 		.update(profiles)
 		.set({

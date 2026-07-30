@@ -8,7 +8,6 @@
 		"dev": "tsx watch src/server.ts",
 		"build": "tsc",
 		"start": "node dist/server.js",
-		"test": "npm run test:integration",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
 		"db:studio": "drizzle-kit studio",
@@ -20,9 +19,12 @@
 		"lint:fix": "eslint src tests drizzle.config.ts vitest.config.ts --fix",
 		"format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"drizzle.config.ts\" \"vitest.config.ts\" \"package.json\"",
 		"format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"drizzle.config.ts\" \"vitest.config.ts\" \"package.json\"",
-		"test:watch": "vitest",
-		"test:coverage": "npm run db:seed && vitest run tests/integration --coverage",
-		"test:integration": "npm run db:seed && vitest run tests/integration"
+		"test": "npm run test:typecheck && npm run test:unit && npm run test:integration",
+		"test:unit": "vitest run --project unit",
+		"test:unit:watch": "vitest --project unit",
+		"test:typecheck": "tsc --noEmit -p tests/tsconfig.json",
+		"test:integration": "npm run db:seed && vitest run --project integration",
+		"test:coverage": "npm run db:seed && vitest run --coverage"
 	},
 	"keywords": [],
 	"author": "",
