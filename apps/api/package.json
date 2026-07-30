@@ -19,9 +19,10 @@
 		"lint:fix": "eslint src tests drizzle.config.ts vitest.config.ts --fix",
 		"format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"drizzle.config.ts\" \"vitest.config.ts\" \"package.json\"",
 		"format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"drizzle.config.ts\" \"vitest.config.ts\" \"package.json\"",
-		"test": "npm run test:unit && npm run test:integration",
+		"test": "npm run test:typecheck && npm run test:unit && npm run test:integration",
 		"test:unit": "vitest run --project unit",
 		"test:unit:watch": "vitest --project unit",
+		"test:typecheck": "tsc --noEmit -p tests/tsconfig.json",
 		"test:integration": "npm run db:seed && vitest run --project integration",
 		"test:coverage": "npm run db:seed && vitest run --coverage"
 	},
