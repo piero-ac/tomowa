@@ -1,6 +1,11 @@
 import { and, asc, desc, eq, gt, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { profiles, sessionRequests, sessions } from "../db/schema.js";
+import {
+	profiles,
+	sessionRequests,
+	sessions,
+	type SelectSession,
+} from "../db/schema.js";
 import type {
 	CreateSessionInput,
 	CreateSessionResponseDto,
@@ -152,7 +157,9 @@ export async function getBookedSessionsForUser(
 		.limit(input.limit + 1);
 }
 
-export async function getSessionById(sessionId: string) {
+export async function getSessionById(
+	sessionId: string,
+): Promise<SelectSession | null> {
 	const [session] = await db
 		.select()
 		.from(sessions)
@@ -201,7 +208,7 @@ export async function updateSession(
 	sessionId: string,
 	ownerId: string,
 	input: UpdateSessionInput,
-) {
+): Promise<SelectSession | null> {
 	const [updatedSession] = await db
 		.update(sessions)
 		.set({
