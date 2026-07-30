@@ -3,6 +3,7 @@ import { db } from "../db/index.js";
 import { profiles, sessionRequests, sessions } from "../db/schema.js";
 import type {
 	CreateSessionInput,
+	CreateSessionResponseDto,
 	UpdateSessionInput,
 } from "../types/session.js";
 import type { PaginationInput } from "../types/pagination.js";
@@ -175,7 +176,9 @@ export async function getSessionWithOwnerById(sessionId: string) {
 	return result ?? null;
 }
 
-export async function createSession(input: CreateSessionInput) {
+export async function createSession(
+	input: CreateSessionInput,
+): Promise<CreateSessionResponseDto | null> {
 	const [createdSession] = await db
 		.insert(sessions)
 		.values({
