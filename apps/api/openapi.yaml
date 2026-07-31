@@ -368,6 +368,146 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/me/profile:
+    get:
+      tags:
+        - Me
+      summary: Get my profile
+      description: >
+        Returns the authenticated user's complete application profile. Auth
+        identity fields such as email and password are not included.
+      operationId: getMyProfile
+      responses:
+        "200":
+          description: The authenticated user's profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    patch:
+      tags:
+        - Me
+      summary: Update my profile
+      description: >
+        Updates one or more editable profile fields. Usernames are normalized
+        to lowercase and must be unique. A null value clears a nullable field.
+        Identity and server-controlled fields cannot be updated here.
+      operationId: updateMyProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileBody"
+      responses:
+        "200":
+          description: The updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/me/sessions-created:
+    get:
+      tags:
+        - Me
+      summary: List my created sessions
+      description: >
+        Returns every session owned by the authenticated user, ordered by start
+        time and session ID from newest to oldest. Each item includes its
+        meeting link and request-status counts.
+      operationId: listMyCreatedSessions
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of sessions created by the authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnedSessionsPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/me/session-requests:
+    get:
+      tags:
+        - Me
+      summary: List my session requests
+      description: >
+        Returns the authenticated user's complete request history, ordered by
+        request creation time and request ID from newest to oldest. Each item
+        includes the session and its owner's public profile. A meeting link is
+        included only while the request is approved.
+      operationId: listMySessionRequests
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of requests created by the authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSessionRequestsPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/me/sessions-booked:
+    get:
+      tags:
+        - Me
+      summary: List my upcoming bookings
+      description: >
+        Returns future booked sessions where the authenticated user is either
+        the owner or approved requester. Sessions are ordered by start time and
+        session ID from earliest to latest, and meeting links are included.
+      operationId: listMyBookedSessions
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of the authenticated user's upcoming bookings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookedSessionsPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -494,6 +634,56 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    UpdateProfileBody:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        displayName:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 80
+        username:
+          type:
+            - string
+            - "null"
+          minLength: 3
+          maxLength: 30
+          pattern: "^[A-Za-z0-9_]+$"
+          description: Stored in lowercase when provided.
+        bio:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 500
+        nativeLanguage:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 50
+        learningLanguage:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 50
+        timezone:
+          type:
+            - string
+            - "null"
+          description: A valid IANA timezone name, or null to clear it.
+      examples:
+        - displayName: Piero
+          username: piero_123
+          bio: Learning Japanese.
+          nativeLanguage: English
+          learningLanguage: Japanese
+          timezone: America/New_York
 
     PublicProfileSummary:
       type: object
