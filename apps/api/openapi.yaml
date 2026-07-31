@@ -1,0 +1,1229 @@
+openapi: 3.1.0
+
+info:
+  title: Tomowa API
+  version: 1.0.0
+  description: >
+    REST API for creating one-to-one language practice sessions and managing
+    booking requests.
+
+servers:
+  - url: http://localhost:3001
+    description: Local development
+
+tags:
+  - name: Health
+    description: API health checks
+  - name: Sessions
+    description: Language practice sessions
+  - name: Session Requests
+    description: Requests to join sessions
+  - name: Me
+    description: Resources belonging to the authenticated user
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Check API health
+      description: Confirms that the HTTP server is running.
+      operationId: getHealth
+      security: []
+      responses:
+        "200":
+          description: The API is running
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/sessions:
+    get:
+      tags:
+        - Sessions
+      summary: List upcoming sessions
+      description: >
+        Returns future open sessions ordered by start time and session ID.
+        Meeting links are never included in this listing.
+      operationId: listSessions
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of upcoming open sessions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionsPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      tags:
+        - Sessions
+      summary: Create a session
+      description: >
+        Creates a future open session owned by the authenticated user. The
+        owner ID is derived from the access token and cannot be supplied by the
+        client. An owner cannot have two open or booked sessions with the same
+        start time.
+      operationId: createSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionBody"
+      responses:
+        "201":
+          description: The session was created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateSessionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/sessions/{sessionId}:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+
+    get:
+      tags:
+        - Sessions
+      summary: Get a session
+      description: >
+        Returns a session and its owner's public profile. The meeting link is
+        included only when the authenticated user owns the session or has the
+        approved request for it.
+      operationId: getSession
+      responses:
+        "200":
+          description: The requested session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionWithOwner"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    patch:
+      tags:
+        - Sessions
+      summary: Update a session
+      description: >
+        Updates one or more session fields. Only the owner may update a
+        session. Cancelled and completed sessions cannot be updated, and the
+        start time of a booked session cannot be changed. A supplied start time
+        must be in the future.
+      operationId: updateSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSessionBody"
+      responses:
+        "200":
+          description: The updated session, including its meeting link
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionWithMeetingLink"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      tags:
+        - Sessions
+      summary: Delete or cancel a session
+      description: >
+        Only the owner may perform this action. An unused open session is
+        permanently deleted. A session with request history is marked
+        cancelled and its pending or approved requests are cancelled. Started,
+        completed, and already-cancelled sessions cannot be cancelled.
+      operationId: deleteSession
+      responses:
+        "204":
+          description: The session was deleted or cancelled
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/sessions/{sessionId}/requests:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+
+    get:
+      tags:
+        - Session Requests
+      summary: List requests for a session
+      description: >
+        Returns the session's complete request history from newest to oldest,
+        including each requester's public profile. Only the session owner may
+        view this list.
+      operationId: listSessionRequests
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of requests for the session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRequestsPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      tags:
+        - Session Requests
+      summary: Request a session
+      description: >
+        Creates a pending request from the authenticated user. The session must
+        exist, be open, and start in the future. Owners cannot request their own
+        sessions, and a requester cannot have more than one pending or approved
+        request for the same session.
+      operationId: createSessionRequest
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequestBody"
+      responses:
+        "201":
+          description: The pending request was created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRequest"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/sessions/{sessionId}/requests/{requestId}/approve:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+      - $ref: "#/components/parameters/RequestId"
+
+    post:
+      tags:
+        - Session Requests
+      summary: Approve a session request
+      description: >
+        Approves a pending request for an open future session. Only the session
+        owner may approve it. Approval atomically books the session and declines
+        every other pending request for that session.
+      operationId: approveSessionRequest
+      responses:
+        "200":
+          description: The approved request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRequest"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/sessions/{sessionId}/requests/{requestId}/decline:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+      - $ref: "#/components/parameters/RequestId"
+
+    post:
+      tags:
+        - Session Requests
+      summary: Decline a session request
+      description: >
+        Declines a pending request. Only the owner of the associated session may
+        perform this action.
+      operationId: declineSessionRequest
+      responses:
+        "200":
+          description: The declined request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRequest"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/sessions/{sessionId}/requests/{requestId}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+      - $ref: "#/components/parameters/RequestId"
+
+    post:
+      tags:
+        - Session Requests
+      summary: Cancel a session request
+      description: >
+        Cancels the authenticated requester's own pending or approved request.
+        Cancelling a pending request changes only that request. Cancelling an
+        approved future booking atomically reopens the session and removes the
+        requester's access to its meeting link.
+      operationId: cancelSessionRequest
+      responses:
+        "200":
+          description: The cancelled request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRequest"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/me/profile:
+    get:
+      tags:
+        - Me
+      summary: Get my profile
+      description: >
+        Returns the authenticated user's complete application profile. Auth
+        identity fields such as email and password are not included.
+      operationId: getMyProfile
+      responses:
+        "200":
+          description: The authenticated user's profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    patch:
+      tags:
+        - Me
+      summary: Update my profile
+      description: >
+        Updates one or more editable profile fields. Usernames are normalized
+        to lowercase and must be unique. A null value clears a nullable field.
+        Identity and server-controlled fields cannot be updated here.
+      operationId: updateMyProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileBody"
+      responses:
+        "200":
+          description: The updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/me/sessions-created:
+    get:
+      tags:
+        - Me
+      summary: List my created sessions
+      description: >
+        Returns every session owned by the authenticated user, ordered by start
+        time and session ID from newest to oldest. Each item includes its
+        meeting link and request-status counts.
+      operationId: listMyCreatedSessions
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of sessions created by the authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnedSessionsPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/me/session-requests:
+    get:
+      tags:
+        - Me
+      summary: List my session requests
+      description: >
+        Returns the authenticated user's complete request history, ordered by
+        request creation time and request ID from newest to oldest. Each item
+        includes the session and its owner's public profile. A meeting link is
+        included only while the request is approved.
+      operationId: listMySessionRequests
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of requests created by the authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSessionRequestsPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/me/sessions-booked:
+    get:
+      tags:
+        - Me
+      summary: List my upcoming bookings
+      description: >
+        Returns future booked sessions where the authenticated user is either
+        the owner or approved requester. Sessions are ordered by start time and
+        session ID from earliest to latest, and meeting links are included.
+      operationId: listMyBookedSessions
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of the authenticated user's upcoming bookings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookedSessionsPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase access token.
+
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - service
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+        service:
+          type: string
+          enum:
+            - tomowa-api
+      examples:
+        - status: ok
+          service: tomowa-api
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          example: Resource not found.
+
+    ValidationErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - message
+        - errors
+      properties:
+        message:
+          type: string
+          example: Validation failed.
+        errors:
+          $ref: "#/components/schemas/ValidationErrors"
+
+    ValidationErrors:
+      type: object
+      additionalProperties: false
+      required:
+        - formErrors
+        - fieldErrors
+      properties:
+        formErrors:
+          type: array
+          items:
+            type: string
+        fieldErrors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+      examples:
+        - formErrors: []
+          fieldErrors:
+            title:
+              - Title is required
+
+    Profile:
+      type: object
+      additionalProperties: false
+      required:
+        - userId
+        - displayName
+        - username
+        - bio
+        - avatarKey
+        - nativeLanguage
+        - learningLanguage
+        - timezone
+        - createdAt
+        - updatedAt
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type:
+            - string
+            - "null"
+        username:
+          type:
+            - string
+            - "null"
+        bio:
+          type:
+            - string
+            - "null"
+        avatarKey:
+          type:
+            - string
+            - "null"
+        nativeLanguage:
+          type:
+            - string
+            - "null"
+        learningLanguage:
+          type:
+            - string
+            - "null"
+        timezone:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UpdateProfileBody:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        displayName:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 80
+        username:
+          type:
+            - string
+            - "null"
+          minLength: 3
+          maxLength: 30
+          pattern: "^[A-Za-z0-9_]+$"
+          description: Stored in lowercase when provided.
+        bio:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 500
+        nativeLanguage:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 50
+        learningLanguage:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 50
+        timezone:
+          type:
+            - string
+            - "null"
+          description: A valid IANA timezone name, or null to clear it.
+      examples:
+        - displayName: Piero
+          username: piero_123
+          bio: Learning Japanese.
+          nativeLanguage: English
+          learningLanguage: Japanese
+          timezone: America/New_York
+
+    PublicProfileSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - userId
+        - displayName
+        - username
+        - avatarKey
+        - nativeLanguage
+        - learningLanguage
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type:
+            - string
+            - "null"
+        username:
+          type:
+            - string
+            - "null"
+        avatarKey:
+          type:
+            - string
+            - "null"
+        nativeLanguage:
+          type:
+            - string
+            - "null"
+        learningLanguage:
+          type:
+            - string
+            - "null"
+
+    SessionStatus:
+      type: string
+      enum:
+        - open
+        - booked
+        - completed
+        - cancelled
+
+    Session:
+      type: object
+      required:
+        - sessionId
+        - ownerId
+        - title
+        - targetLanguage
+        - helpLanguage
+        - startsAt
+        - durationMinutes
+        - status
+        - imageKey
+        - description
+        - createdAt
+        - updatedAt
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        ownerId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        targetLanguage:
+          type: string
+        helpLanguage:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        durationMinutes:
+          type: integer
+          minimum: 15
+          maximum: 120
+        status:
+          $ref: "#/components/schemas/SessionStatus"
+        meetingLink:
+          type: string
+          format: uri
+          description: >
+            Included only when the authenticated user is the owner or approved
+            requester.
+        imageKey:
+          type:
+            - string
+            - "null"
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    SessionWithOwner:
+      allOf:
+        - $ref: "#/components/schemas/Session"
+        - type: object
+          required:
+            - owner
+          properties:
+            owner:
+              $ref: "#/components/schemas/PublicProfileSummary"
+
+    SessionWithMeetingLink:
+      allOf:
+        - $ref: "#/components/schemas/Session"
+        - type: object
+          required:
+            - meetingLink
+          properties:
+            meetingLink:
+              type: string
+              format: uri
+
+    SessionRequestSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - pending
+        - approved
+        - declined
+        - cancelled
+        - total
+      properties:
+        pending:
+          type: integer
+          minimum: 0
+        approved:
+          type: integer
+          minimum: 0
+        declined:
+          type: integer
+          minimum: 0
+        cancelled:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+
+    OwnedSession:
+      allOf:
+        - $ref: "#/components/schemas/SessionWithOwner"
+        - type: object
+          required:
+            - meetingLink
+            - requestSummary
+          properties:
+            meetingLink:
+              type: string
+              format: uri
+            requestSummary:
+              $ref: "#/components/schemas/SessionRequestSummary"
+
+    BookedSession:
+      allOf:
+        - $ref: "#/components/schemas/SessionWithOwner"
+        - type: object
+          required:
+            - meetingLink
+          properties:
+            meetingLink:
+              type: string
+              format: uri
+
+    CreateSessionResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - sessionId
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+
+    CreateSessionBody:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - targetLanguage
+        - helpLanguage
+        - startsAt
+        - durationMinutes
+        - meetingLink
+        - description
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        targetLanguage:
+          type: string
+          minLength: 1
+          maxLength: 50
+        helpLanguage:
+          type: string
+          minLength: 1
+          maxLength: 50
+        startsAt:
+          type: string
+          format: date-time
+          description: Must be in the future.
+        durationMinutes:
+          type: integer
+          minimum: 15
+          maximum: 120
+        meetingLink:
+          type: string
+          format: uri
+          description: Must use HTTP or HTTPS.
+        imageKey:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 500
+        description:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      examples:
+        - title: Japanese Conversation Practice
+          targetLanguage: Japanese
+          helpLanguage: English
+          startsAt: "2027-08-15T18:00:00Z"
+          durationMinutes: 30
+          meetingLink: https://example.test/meeting/japanese
+          imageKey: null
+          description: Practice conversational Japanese together.
+
+    UpdateSessionBody:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        targetLanguage:
+          type: string
+          minLength: 1
+          maxLength: 50
+        helpLanguage:
+          type: string
+          minLength: 1
+          maxLength: 50
+        startsAt:
+          type: string
+          format: date-time
+          description: Must be in the future and cannot change when booked.
+        durationMinutes:
+          type: integer
+          minimum: 15
+          maximum: 120
+        meetingLink:
+          type: string
+          format: uri
+          description: Must use HTTP or HTTPS.
+        imageKey:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 500
+        description:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      examples:
+        - title: Updated Japanese Conversation Practice
+          durationMinutes: 45
+
+    SessionRequestStatus:
+      type: string
+      enum:
+        - pending
+        - approved
+        - declined
+        - cancelled
+
+    SessionRequest:
+      type: object
+      required:
+        - requestId
+        - sessionId
+        - requesterId
+        - status
+        - message
+        - createdAt
+        - respondedAt
+        - updatedAt
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        sessionId:
+          type: string
+          format: uuid
+        requesterId:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/SessionRequestStatus"
+        message:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+        respondedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateSessionRequestBody:
+      type: object
+      additionalProperties: false
+      properties:
+        message:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 500
+      examples:
+        - message: I would like to practice conversational Japanese.
+
+    SessionRequestWithRequester:
+      allOf:
+        - $ref: "#/components/schemas/SessionRequest"
+        - type: object
+          required:
+            - requester
+          properties:
+            requester:
+              $ref: "#/components/schemas/PublicProfileSummary"
+
+    UserSessionRequest:
+      allOf:
+        - $ref: "#/components/schemas/SessionRequest"
+        - type: object
+          required:
+            - session
+          properties:
+            session:
+              $ref: "#/components/schemas/SessionWithOwner"
+
+    SessionsPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionWithOwner"
+        nextCursor:
+          type:
+            - string
+            - "null"
+          description: Opaque cursor for the next page, or null on the last page.
+
+    OwnedSessionsPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OwnedSession"
+        nextCursor:
+          type:
+            - string
+            - "null"
+          description: Opaque cursor for the next page, or null on the last page.
+
+    BookedSessionsPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BookedSession"
+        nextCursor:
+          type:
+            - string
+            - "null"
+          description: Opaque cursor for the next page, or null on the last page.
+
+    SessionRequestsPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionRequestWithRequester"
+        nextCursor:
+          type:
+            - string
+            - "null"
+          description: Opaque cursor for the next page, or null on the last page.
+
+    UserSessionRequestsPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserSessionRequest"
+        nextCursor:
+          type:
+            - string
+            - "null"
+          description: Opaque cursor for the next page, or null on the last page.
+
+  parameters:
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      description: Session identifier.
+      schema:
+        type: string
+        format: uuid
+
+    RequestId:
+      name: requestId
+      in: path
+      required: true
+      description: Session request identifier.
+      schema:
+        type: string
+        format: uuid
+
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of items to return.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 20
+
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor returned by the previous page.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 500
+
+  responses:
+    BadRequest:
+      description: The request is malformed or fails validation
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/ErrorResponse"
+              - $ref: "#/components/schemas/ValidationErrorResponse"
+
+    Unauthorized:
+      description: A valid Supabase access token is required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            message: Authentication required.
+
+    Forbidden:
+      description: The authenticated user is not allowed to perform the action
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    NotFound:
+      description: The requested resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Conflict:
+      description: The request conflicts with the current resource state
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    PayloadTooLarge:
+      description: The JSON request body exceeds 100 KB
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            message: Request body is too large.
+
+    InternalServerError:
+      description: An unexpected server error occurred
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            message: Internal server error.
