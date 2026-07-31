@@ -194,6 +194,180 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/sessions/{sessionId}/requests:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+
+    get:
+      tags:
+        - Session Requests
+      summary: List requests for a session
+      description: >
+        Returns the session's complete request history from newest to oldest,
+        including each requester's public profile. Only the session owner may
+        view this list.
+      operationId: listSessionRequests
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of requests for the session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRequestsPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      tags:
+        - Session Requests
+      summary: Request a session
+      description: >
+        Creates a pending request from the authenticated user. The session must
+        exist, be open, and start in the future. Owners cannot request their own
+        sessions, and a requester cannot have more than one pending or approved
+        request for the same session.
+      operationId: createSessionRequest
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequestBody"
+      responses:
+        "201":
+          description: The pending request was created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRequest"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/sessions/{sessionId}/requests/{requestId}/approve:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+      - $ref: "#/components/parameters/RequestId"
+
+    post:
+      tags:
+        - Session Requests
+      summary: Approve a session request
+      description: >
+        Approves a pending request for an open future session. Only the session
+        owner may approve it. Approval atomically books the session and declines
+        every other pending request for that session.
+      operationId: approveSessionRequest
+      responses:
+        "200":
+          description: The approved request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRequest"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/sessions/{sessionId}/requests/{requestId}/decline:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+      - $ref: "#/components/parameters/RequestId"
+
+    post:
+      tags:
+        - Session Requests
+      summary: Decline a session request
+      description: >
+        Declines a pending request. Only the owner of the associated session may
+        perform this action.
+      operationId: declineSessionRequest
+      responses:
+        "200":
+          description: The declined request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRequest"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/sessions/{sessionId}/requests/{requestId}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+      - $ref: "#/components/parameters/RequestId"
+
+    post:
+      tags:
+        - Session Requests
+      summary: Cancel a session request
+      description: >
+        Cancels the authenticated requester's own pending or approved request.
+        Cancelling a pending request changes only that request. Cancelling an
+        approved future booking atomically reopens the session and removes the
+        requester's access to its meeting link.
+      operationId: cancelSessionRequest
+      responses:
+        "200":
+          description: The cancelled request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRequest"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -648,6 +822,19 @@ components:
           type: string
           format: date-time
 
+    CreateSessionRequestBody:
+      type: object
+      additionalProperties: false
+      properties:
+        message:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 500
+      examples:
+        - message: I would like to practice conversational Japanese.
+
     SessionRequestWithRequester:
       allOf:
         - $ref: "#/components/schemas/SessionRequest"
@@ -759,6 +946,15 @@ components:
       in: path
       required: true
       description: Session identifier.
+      schema:
+        type: string
+        format: uuid
+
+    RequestId:
+      name: requestId
+      in: path
+      required: true
+      description: Session request identifier.
       schema:
         type: string
         format: uuid
