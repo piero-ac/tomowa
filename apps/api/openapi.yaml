@@ -41,6 +41,159 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
 
+  /api/sessions:
+    get:
+      tags:
+        - Sessions
+      summary: List upcoming sessions
+      description: >
+        Returns future open sessions ordered by start time and session ID.
+        Meeting links are never included in this listing.
+      operationId: listSessions
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of upcoming open sessions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionsPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      tags:
+        - Sessions
+      summary: Create a session
+      description: >
+        Creates a future open session owned by the authenticated user. The
+        owner ID is derived from the access token and cannot be supplied by the
+        client. An owner cannot have two open or booked sessions with the same
+        start time.
+      operationId: createSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionBody"
+      responses:
+        "201":
+          description: The session was created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateSessionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/sessions/{sessionId}:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+
+    get:
+      tags:
+        - Sessions
+      summary: Get a session
+      description: >
+        Returns a session and its owner's public profile. The meeting link is
+        included only when the authenticated user owns the session or has the
+        approved request for it.
+      operationId: getSession
+      responses:
+        "200":
+          description: The requested session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionWithOwner"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    patch:
+      tags:
+        - Sessions
+      summary: Update a session
+      description: >
+        Updates one or more session fields. Only the owner may update a
+        session. Cancelled and completed sessions cannot be updated, and the
+        start time of a booked session cannot be changed. A supplied start time
+        must be in the future.
+      operationId: updateSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSessionBody"
+      responses:
+        "200":
+          description: The updated session, including its meeting link
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionWithMeetingLink"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      tags:
+        - Sessions
+      summary: Delete or cancel a session
+      description: >
+        Only the owner may perform this action. An unused open session is
+        permanently deleted. A session with request history is marked
+        cancelled and its pending or approved requests are cancelled. Started,
+        completed, and already-cancelled sessions cannot be cancelled.
+      operationId: deleteSession
+      responses:
+        "204":
+          description: The session was deleted or cancelled
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -277,6 +430,17 @@ components:
             owner:
               $ref: "#/components/schemas/PublicProfileSummary"
 
+    SessionWithMeetingLink:
+      allOf:
+        - $ref: "#/components/schemas/Session"
+        - type: object
+          required:
+            - meetingLink
+          properties:
+            meetingLink:
+              type: string
+              format: uri
+
     SessionRequestSummary:
       type: object
       additionalProperties: false
@@ -337,6 +501,105 @@ components:
         sessionId:
           type: string
           format: uuid
+
+    CreateSessionBody:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - targetLanguage
+        - helpLanguage
+        - startsAt
+        - durationMinutes
+        - meetingLink
+        - description
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        targetLanguage:
+          type: string
+          minLength: 1
+          maxLength: 50
+        helpLanguage:
+          type: string
+          minLength: 1
+          maxLength: 50
+        startsAt:
+          type: string
+          format: date-time
+          description: Must be in the future.
+        durationMinutes:
+          type: integer
+          minimum: 15
+          maximum: 120
+        meetingLink:
+          type: string
+          format: uri
+          description: Must use HTTP or HTTPS.
+        imageKey:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 500
+        description:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      examples:
+        - title: Japanese Conversation Practice
+          targetLanguage: Japanese
+          helpLanguage: English
+          startsAt: "2027-08-15T18:00:00Z"
+          durationMinutes: 30
+          meetingLink: https://example.test/meeting/japanese
+          imageKey: null
+          description: Practice conversational Japanese together.
+
+    UpdateSessionBody:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        targetLanguage:
+          type: string
+          minLength: 1
+          maxLength: 50
+        helpLanguage:
+          type: string
+          minLength: 1
+          maxLength: 50
+        startsAt:
+          type: string
+          format: date-time
+          description: Must be in the future and cannot change when booked.
+        durationMinutes:
+          type: integer
+          minimum: 15
+          maximum: 120
+        meetingLink:
+          type: string
+          format: uri
+          description: Must use HTTP or HTTPS.
+        imageKey:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 500
+        description:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      examples:
+        - title: Updated Japanese Conversation Practice
+          durationMinutes: 45
 
     SessionRequestStatus:
       type: string
@@ -491,6 +754,15 @@ components:
           description: Opaque cursor for the next page, or null on the last page.
 
   parameters:
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      description: Session identifier.
+      schema:
+        type: string
+        format: uuid
+
     Limit:
       name: limit
       in: query
@@ -551,6 +823,15 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+
+    PayloadTooLarge:
+      description: The JSON request body exceeds 100 KB
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            message: Request body is too large.
 
     InternalServerError:
       description: An unexpected server error occurred
