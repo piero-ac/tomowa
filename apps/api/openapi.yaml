@@ -1,0 +1,165 @@
+openapi: 3.1.0
+
+info:
+  title: Tomowa API
+  version: 1.0.0
+  description: >
+    REST API for creating one-to-one language practice sessions and managing
+    booking requests.
+
+servers:
+  - url: http://localhost:3001
+    description: Local development
+
+tags:
+  - name: Health
+    description: API health checks
+  - name: Sessions
+    description: Language practice sessions
+  - name: Session Requests
+    description: Requests to join sessions
+  - name: Me
+    description: Resources belonging to the authenticated user
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Check API health
+      description: Confirms that the HTTP server is running.
+      operationId: getHealth
+      security: []
+      responses:
+        "200":
+          description: The API is running
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase access token.
+
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - service
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+        service:
+          type: string
+          enum:
+            - tomowa-api
+      examples:
+        - status: ok
+          service: tomowa-api
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          example: Resource not found.
+
+    ValidationErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - message
+        - errors
+      properties:
+        message:
+          type: string
+          example: Validation failed.
+        errors:
+          $ref: "#/components/schemas/ValidationErrors"
+
+    ValidationErrors:
+      type: object
+      additionalProperties: false
+      required:
+        - formErrors
+        - fieldErrors
+      properties:
+        formErrors:
+          type: array
+          items:
+            type: string
+        fieldErrors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+      examples:
+        - formErrors: []
+          fieldErrors:
+            title:
+              - Title is required
+
+  responses:
+    BadRequest:
+      description: The request is malformed or fails validation
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/ErrorResponse"
+              - $ref: "#/components/schemas/ValidationErrorResponse"
+
+    Unauthorized:
+      description: A valid Supabase access token is required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            message: Authentication required.
+
+    Forbidden:
+      description: The authenticated user is not allowed to perform the action
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    NotFound:
+      description: The requested resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Conflict:
+      description: The request conflicts with the current resource state
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    InternalServerError:
+      description: An unexpected server error occurred
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            message: Internal server error.
