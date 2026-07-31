@@ -115,6 +115,403 @@ components:
             title:
               - Title is required
 
+    Profile:
+      type: object
+      additionalProperties: false
+      required:
+        - userId
+        - displayName
+        - username
+        - bio
+        - avatarKey
+        - nativeLanguage
+        - learningLanguage
+        - timezone
+        - createdAt
+        - updatedAt
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type:
+            - string
+            - "null"
+        username:
+          type:
+            - string
+            - "null"
+        bio:
+          type:
+            - string
+            - "null"
+        avatarKey:
+          type:
+            - string
+            - "null"
+        nativeLanguage:
+          type:
+            - string
+            - "null"
+        learningLanguage:
+          type:
+            - string
+            - "null"
+        timezone:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PublicProfileSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - userId
+        - displayName
+        - username
+        - avatarKey
+        - nativeLanguage
+        - learningLanguage
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type:
+            - string
+            - "null"
+        username:
+          type:
+            - string
+            - "null"
+        avatarKey:
+          type:
+            - string
+            - "null"
+        nativeLanguage:
+          type:
+            - string
+            - "null"
+        learningLanguage:
+          type:
+            - string
+            - "null"
+
+    SessionStatus:
+      type: string
+      enum:
+        - open
+        - booked
+        - completed
+        - cancelled
+
+    Session:
+      type: object
+      required:
+        - sessionId
+        - ownerId
+        - title
+        - targetLanguage
+        - helpLanguage
+        - startsAt
+        - durationMinutes
+        - status
+        - imageKey
+        - description
+        - createdAt
+        - updatedAt
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        ownerId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        targetLanguage:
+          type: string
+        helpLanguage:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        durationMinutes:
+          type: integer
+          minimum: 15
+          maximum: 120
+        status:
+          $ref: "#/components/schemas/SessionStatus"
+        meetingLink:
+          type: string
+          format: uri
+          description: >
+            Included only when the authenticated user is the owner or approved
+            requester.
+        imageKey:
+          type:
+            - string
+            - "null"
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    SessionWithOwner:
+      allOf:
+        - $ref: "#/components/schemas/Session"
+        - type: object
+          required:
+            - owner
+          properties:
+            owner:
+              $ref: "#/components/schemas/PublicProfileSummary"
+
+    SessionRequestSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - pending
+        - approved
+        - declined
+        - cancelled
+        - total
+      properties:
+        pending:
+          type: integer
+          minimum: 0
+        approved:
+          type: integer
+          minimum: 0
+        declined:
+          type: integer
+          minimum: 0
+        cancelled:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+
+    OwnedSession:
+      allOf:
+        - $ref: "#/components/schemas/SessionWithOwner"
+        - type: object
+          required:
+            - meetingLink
+            - requestSummary
+          properties:
+            meetingLink:
+              type: string
+              format: uri
+            requestSummary:
+              $ref: "#/components/schemas/SessionRequestSummary"
+
+    BookedSession:
+      allOf:
+        - $ref: "#/components/schemas/SessionWithOwner"
+        - type: object
+          required:
+            - meetingLink
+          properties:
+            meetingLink:
+              type: string
+              format: uri
+
+    CreateSessionResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - sessionId
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+
+    SessionRequestStatus:
+      type: string
+      enum:
+        - pending
+        - approved
+        - declined
+        - cancelled
+
+    SessionRequest:
+      type: object
+      required:
+        - requestId
+        - sessionId
+        - requesterId
+        - status
+        - message
+        - createdAt
+        - respondedAt
+        - updatedAt
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        sessionId:
+          type: string
+          format: uuid
+        requesterId:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/SessionRequestStatus"
+        message:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+        respondedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    SessionRequestWithRequester:
+      allOf:
+        - $ref: "#/components/schemas/SessionRequest"
+        - type: object
+          required:
+            - requester
+          properties:
+            requester:
+              $ref: "#/components/schemas/PublicProfileSummary"
+
+    UserSessionRequest:
+      allOf:
+        - $ref: "#/components/schemas/SessionRequest"
+        - type: object
+          required:
+            - session
+          properties:
+            session:
+              $ref: "#/components/schemas/SessionWithOwner"
+
+    SessionsPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionWithOwner"
+        nextCursor:
+          type:
+            - string
+            - "null"
+          description: Opaque cursor for the next page, or null on the last page.
+
+    OwnedSessionsPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OwnedSession"
+        nextCursor:
+          type:
+            - string
+            - "null"
+          description: Opaque cursor for the next page, or null on the last page.
+
+    BookedSessionsPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BookedSession"
+        nextCursor:
+          type:
+            - string
+            - "null"
+          description: Opaque cursor for the next page, or null on the last page.
+
+    SessionRequestsPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionRequestWithRequester"
+        nextCursor:
+          type:
+            - string
+            - "null"
+          description: Opaque cursor for the next page, or null on the last page.
+
+    UserSessionRequestsPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserSessionRequest"
+        nextCursor:
+          type:
+            - string
+            - "null"
+          description: Opaque cursor for the next page, or null on the last page.
+
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of items to return.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 20
+
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor returned by the previous page.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 500
+
   responses:
     BadRequest:
       description: The request is malformed or fails validation
