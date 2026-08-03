@@ -21,8 +21,8 @@ app.use(
 app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: "100kb" }));
-app.get("/openapi.json", getOpenApiDocument);
 
+app.get("/openapi.json", getOpenApiDocument);
 app.use("/health", healthRouter);
 app.use("/api", apiRouter);
 
