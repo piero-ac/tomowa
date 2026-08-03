@@ -17,14 +17,15 @@
 		"supabase:status": "supabase status",
 		"lint": "eslint src tests drizzle.config.ts vitest.config.ts",
 		"lint:fix": "eslint src tests drizzle.config.ts vitest.config.ts --fix",
-		"format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"drizzle.config.ts\" \"vitest.config.ts\" \"package.json\"",
-		"format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"drizzle.config.ts\" \"vitest.config.ts\" \"package.json\"",
+		"format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"drizzle.config.ts\" \"vitest.config.ts\" \"openapi.yaml\" \".redocly.lint-ignore.yaml\" \"package.json\"",
+		"format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"drizzle.config.ts\" \"vitest.config.ts\" \"openapi.yaml\" \".redocly.lint-ignore.yaml\" \"package.json\"",
 		"test": "npm run test:typecheck && npm run test:unit && npm run test:integration",
 		"test:unit": "vitest run --project unit",
 		"test:unit:watch": "vitest --project unit",
 		"test:typecheck": "tsc --noEmit -p tests/tsconfig.json",
 		"test:integration": "npm run db:seed && vitest run --project integration",
-		"test:coverage": "npm run db:seed && vitest run --coverage"
+		"test:coverage": "npm run db:seed && vitest run --coverage",
+		"openapi:lint": "redocly lint openapi.yaml"
 	},
 	"keywords": [],
 	"author": "",
@@ -32,6 +33,7 @@
 	"type": "module",
 	"devDependencies": {
 		"@eslint/js": "^9.39.4",
+		"@redocly/cli": "^2.43.3",
 		"@types/cors": "^2.8.19",
 		"@types/express": "^5.0.6",
 		"@types/node": "^20.19.43",

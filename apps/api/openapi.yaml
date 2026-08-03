@@ -3,6 +3,9 @@ openapi: 3.1.0
 info:
   title: Tomowa API
   version: 1.0.0
+  license:
+    name: ISC
+    identifier: ISC
   description: >
     REST API for creating one-to-one language practice sessions and managing
     booking requests.
