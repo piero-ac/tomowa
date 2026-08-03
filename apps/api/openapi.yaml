@@ -8,8 +8,8 @@ info:
     booking requests.
 
 servers:
-  - url: http://localhost:3001
-    description: Local development
+  - url: /
+    description: Current server
 
 tags:
   - name: Health
