@@ -39,19 +39,19 @@ Supabase users are not accepted.
 
 ## Authorization rules
 
-| Action | Permission |
-| --- | --- |
-| Health check | Public |
-| Browse and view sessions | Any authenticated user |
-| Create a session | Any authenticated user |
-| Edit an open session | Session owner only |
-| Delete or cancel a session | Session owner only |
-| Request a session | Any authenticated user except its owner |
-| Cancel a pending request | Requester only |
-| Approve or decline a request | Session owner only |
-| Cancel an approved booking | Session owner or approved requester |
-| View a meeting link | Session owner or approved requester |
-| View or edit a profile | As specified by the profile endpoint |
+| Action                       | Permission                              |
+| ---------------------------- | --------------------------------------- |
+| Health check                 | Public                                  |
+| Browse and view sessions     | Any authenticated user                  |
+| Create a session             | Any authenticated user                  |
+| Edit an active session       | Session owner only                      |
+| Delete or cancel a session   | Session owner only                      |
+| Request a session            | Any authenticated user except its owner |
+| Cancel a pending request     | Requester only                          |
+| Approve or decline a request | Session owner only                      |
+| Cancel an approved booking   | Session owner or approved requester     |
+| View a meeting link          | Session owner or approved requester     |
+| View or edit a profile       | As specified by the profile endpoint    |
 
 ## Models
 
@@ -59,16 +59,16 @@ Supabase users are not accepted.
 
 ```ts
 interface Profile {
-	userId: string;
-	displayName: string | null;
-	username: string | null;
-	bio: string | null;
-	avatarKey: string | null;
-	nativeLanguage: string | null;
-	learningLanguage: string | null;
-	timezone: string | null;
-	createdAt: string;
-	updatedAt: string;
+  userId: string;
+  displayName: string | null;
+  username: string | null;
+  bio: string | null;
+  avatarKey: string | null;
+  nativeLanguage: string | null;
+  learningLanguage: string | null;
+  timezone: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 ```
 
@@ -80,19 +80,19 @@ Each session represents one available one-to-one practice time.
 type SessionStatus = "open" | "booked" | "completed" | "cancelled";
 
 interface Session {
-	sessionId: string;
-	ownerId: string;
-	title: string;
-	targetLanguage: string;
-	helpLanguage: string;
-	startsAt: string;
-	durationMinutes: number;
-	status: SessionStatus;
-	imageKey: string | null;
-	description: string;
-	meetingLink?: string;
-	createdAt: string;
-	updatedAt: string;
+  sessionId: string;
+  ownerId: string;
+  title: string;
+  targetLanguage: string;
+  helpLanguage: string;
+  startsAt: string;
+  durationMinutes: number;
+  status: SessionStatus;
+  imageKey: string | null;
+  description: string;
+  meetingLink?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 ```
 
@@ -102,30 +102,28 @@ requester.
 ### Session request
 
 ```ts
-type SessionRequestStatus =
-	| "pending"
-	| "approved"
-	| "declined"
-	| "cancelled";
+type SessionRequestStatus = "pending" | "approved" | "declined" | "cancelled";
 
 interface SessionRequest {
-	requestId: string;
-	sessionId: string;
-	requesterId: string;
-	status: SessionRequestStatus;
-	message: string | null;
-	createdAt: string;
-	respondedAt: string | null;
-	updatedAt: string;
+  requestId: string;
+  sessionId: string;
+  requesterId: string;
+  status: SessionRequestStatus;
+  message: string | null;
+  createdAt: string;
+  respondedAt: string | null;
+  updatedAt: string;
 }
 ```
 
 ## Session lifecycle
 
 ```text
-open ────────> booked ────────> completed
+open ────────> booked
   │               │
   └───────────────┴───────────> cancelled
+
+completed (reserved; no automatic transition yet)
 ```
 
 - New sessions start as `open`.
@@ -134,8 +132,8 @@ open ────────> booked ────────> completed
 - An owner may cancel a session.
 - If an approved requester cancels the booking before it starts, that request
   becomes `cancelled` and the session returns to `open`.
-- Completion may initially be derived from time and later persisted by a job or
-  explicit workflow.
+- The `completed` status is reserved in the schema, but the API does not
+  currently transition sessions to it automatically.
 
 ## Request lifecycle
 
@@ -155,8 +153,9 @@ pending ─────> approved
 
 ## Endpoints
 
-The endpoint contract below is the target MVP contract. Some request and profile
-endpoints are not implemented yet.
+The endpoint summary below describes the implemented MVP API. The OpenAPI
+document at `apps/api/openapi.yaml` is the authoritative machine-readable
+contract and is available through Swagger UI at `/docs/` when the API runs.
 
 ### `GET /health`
 
@@ -171,13 +170,13 @@ Request:
 
 ```json
 {
-	"title": "Japanese Conversation",
-	"targetLanguage": "Japanese",
-	"helpLanguage": "English",
-	"startsAt": "2026-08-15T18:00:00Z",
-	"durationMinutes": 30,
-	"meetingLink": "https://meet.google.com/example",
-	"description": "Practice speaking Japanese."
+  "title": "Japanese Conversation",
+  "targetLanguage": "Japanese",
+  "helpLanguage": "English",
+  "startsAt": "2030-08-15T18:00:00Z",
+  "durationMinutes": 30,
+  "meetingLink": "https://meet.google.com/example",
+  "description": "Practice speaking Japanese."
 }
 ```
 
@@ -185,7 +184,7 @@ Response: `201 Created`
 
 ```json
 {
-	"sessionId": "550e8400-e29b-41d4-a716-446655440000"
+  "sessionId": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
@@ -195,10 +194,10 @@ List upcoming sessions. Meeting links are never included.
 
 Query parameters:
 
-| Parameter | Description |
-| --- | --- |
-| `limit` | Maximum number of results |
-| `cursor` | Opaque pagination cursor |
+| Parameter | Description               |
+| --------- | ------------------------- |
+| `limit`   | Maximum number of results |
+| `cursor`  | Opaque pagination cursor  |
 
 The default browse view returns upcoming `open` sessions ordered by
 `startsAt`, then `sessionId`.
@@ -212,17 +211,25 @@ the owner or approved requester.
 
 Update a session. Owner only.
 
-- An open future session may be edited.
+- Open and booked sessions may be edited by their owner.
 - `startsAt` cannot be changed after the session becomes `booked`.
+- Cancelled and completed sessions cannot be edited.
 - Status changes use their dedicated workflows rather than arbitrary patches.
 
 ### `DELETE /sessions/:sessionId`
 
 Delete or cancel a session. Owner only.
 
-The implementation may hard-delete an open session with no history. Once a
-session has requests, prefer setting its status to `cancelled` so request
-history remains meaningful.
+An open session with no request history is hard-deleted. A session with request
+history is instead marked `cancelled`, and its pending or approved requests are
+cancelled in the same transaction. A session cannot be deleted or cancelled
+after it has started.
+
+### `GET /sessions/:sessionId/requests`
+
+List requests submitted for a session. Only the session owner may access this
+endpoint. Results include a public requester profile summary and use cursor
+pagination ordered by request creation time and request ID.
 
 ### `POST /sessions/:sessionId/requests`
 
@@ -232,7 +239,7 @@ Request:
 
 ```json
 {
-	"message": "I would like to practice conversational Japanese."
+  "message": "I would like to practice conversational Japanese."
 }
 ```
 
@@ -275,16 +282,19 @@ ownership fields cannot be changed.
 
 ### `GET /me/sessions-created`
 
-List sessions owned by the authenticated user, including their request summary.
+List sessions owned by the authenticated user, newest first, including their
+request summary and private meeting link.
 
 ### `GET /me/session-requests`
 
-List requests made by the authenticated user, joined with session details.
+List requests made by the authenticated user, newest first, joined with session
+and owner details.
 
 ### `GET /me/sessions-booked`
 
-List booked sessions where the authenticated user is either the owner or the
-approved requester.
+List upcoming booked sessions in start-time order where the authenticated user
+is either the owner or the approved requester. These results include the
+meeting link.
 
 ## Error responses
 
@@ -298,7 +308,7 @@ Missing, malformed, expired, anonymous, or otherwise invalid access token.
 
 ```json
 {
-	"message": "Authentication required."
+  "message": "Authentication required."
 }
 ```
 
