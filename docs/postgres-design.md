@@ -2,8 +2,8 @@
 
 ## Purpose
 
-This document defines the target MVP PostgreSQL design for Tomowa's one-to-one
-language-practice scheduling workflow.
+This document describes the implemented PostgreSQL design for Tomowa's
+one-to-one language-practice scheduling workflow.
 
 The schema is derived from:
 
@@ -13,7 +13,7 @@ The schema is derived from:
 ## Architecture and ownership
 
 ```text
-Next.js
+API client / Swagger UI
     ↓
 Express API
     ↓
@@ -22,7 +22,7 @@ Drizzle ORM
 Supabase PostgreSQL
 ```
 
-Supabase provides PostgreSQL and Auth. The frontend does not query application
+Supabase provides PostgreSQL and Auth. API clients do not query application
 tables directly; Express owns business logic, authorization, and application
 database access.
 
@@ -38,9 +38,21 @@ Drizzle is the application-schema and migration source of truth:
   owner. Run Drizzle migrations against the local Supabase database after the
   local stack starts.
 
+## Database access and row-level security
+
+Row-level security is enabled on `profiles`, `sessions`, and
+`session_requests`. The MVP defines no direct client policies for those tables:
+API clients authenticate with Supabase, then send the resulting access token to
+Express. Express performs application authorization and accesses PostgreSQL
+through its server-side database connection.
+
+This design prevents clients using Supabase publishable credentials from
+querying application tables directly. Database credentials and privileged
+Supabase keys must remain server-side.
+
 ## Core tables
 
-The target MVP requires:
+The implemented MVP uses:
 
 1. `profiles`
 2. `sessions`
@@ -54,18 +66,18 @@ the session's practice partner.
 `profiles` stores application-facing user data. Its primary key matches the
 Supabase Auth user ID.
 
-| Column | Type | Nullable | Description |
-| --- | --- | ---: | --- |
-| `id` | `uuid` | No | PK and FK to `auth.users.id` |
-| `display_name` | `text` | Yes | Public display name |
-| `username` | `text` | Yes | Optional unique handle |
-| `bio` | `text` | Yes | Short public biography |
-| `avatar_key` | `text` | Yes | Object-storage key, not a temporary URL |
-| `native_language` | `text` | Yes | Language the user can help with |
-| `learning_language` | `text` | Yes | Language the user is practicing |
-| `timezone` | `text` | Yes | IANA timezone for display and input |
-| `created_at` | `timestamptz` | No | Creation timestamp |
-| `updated_at` | `timestamptz` | No | Last application update |
+| Column              | Type          | Nullable | Description                             |
+| ------------------- | ------------- | -------: | --------------------------------------- |
+| `id`                | `uuid`        |       No | PK and FK to `auth.users.id`            |
+| `display_name`      | `text`        |      Yes | Public display name                     |
+| `username`          | `text`        |      Yes | Optional unique handle                  |
+| `bio`               | `text`        |      Yes | Short public biography                  |
+| `avatar_key`        | `text`        |      Yes | Object-storage key, not a temporary URL |
+| `native_language`   | `text`        |      Yes | Language the user can help with         |
+| `learning_language` | `text`        |      Yes | Language the user is practicing         |
+| `timezone`          | `text`        |      Yes | IANA timezone for display and input     |
+| `created_at`        | `timestamptz` |       No | Creation timestamp                      |
+| `updated_at`        | `timestamptz` |       No | Last application update                 |
 
 Relationship:
 
@@ -80,15 +92,14 @@ to the Auth schema while retaining referential integrity.
 
 An `AFTER INSERT` trigger on `auth.users` inserts the corresponding profile.
 
-Requirements:
+Implementation:
 
 - Function is `SECURITY DEFINER`.
 - Function has an explicit safe `search_path` and schema-qualified names.
 - `profiles.id` is set from `NEW.id`.
 - Optional metadata is copied defensively.
 - Missing metadata does not fail signup.
-- The migration includes both forward creation and any rollback behavior
-  required by the migration framework.
+- The trigger and function are committed in the Drizzle migration history.
 
 The table remains defined in Drizzle. The trigger and function are tracked as
 custom SQL in a Drizzle-owned migration.
@@ -104,47 +115,38 @@ completed
 cancelled
 ```
 
-Use either a PostgreSQL enum declared through Drizzle or a text column with a
-database check constraint. The application also validates transitions.
+The status is stored in a PostgreSQL enum declared through Drizzle. The
+application also validates transitions.
 
 ## Sessions
 
 Each row represents one available one-to-one practice time.
 
-| Column | Type | Nullable | Description |
-| --- | --- | ---: | --- |
-| `id` | `uuid` | No | Primary key |
-| `owner_id` | `uuid` | No | FK to `profiles.id` |
-| `title` | `text` | No | Session title |
-| `target_language` | `text` | No | Language being practiced |
-| `help_language` | `text` | No | Shared/support language |
-| `starts_at` | `timestamptz` | No | Scheduled start time in UTC |
-| `duration_minutes` | `integer` | No | Session duration |
-| `status` | enum/text | No | Defaults to `open` |
-| `meeting_link` | `text` | No | Private meeting URL |
-| `image_key` | `text` | Yes | Optional object-storage key |
-| `description` | `text` | No | Session details |
-| `created_at` | `timestamptz` | No | Creation timestamp |
-| `updated_at` | `timestamptz` | No | Last update timestamp |
+| Column             | Type            | Nullable | Description                 |
+| ------------------ | --------------- | -------: | --------------------------- |
+| `id`               | `uuid`          |       No | Primary key                 |
+| `owner_id`         | `uuid`          |       No | FK to `profiles.id`         |
+| `title`            | `text`          |       No | Session title               |
+| `target_language`  | `text`          |       No | Language being practiced    |
+| `help_language`    | `text`          |       No | Shared/support language     |
+| `starts_at`        | `timestamptz`   |       No | Scheduled start time in UTC |
+| `duration_minutes` | `integer`       |       No | Session duration            |
+| `status`           | PostgreSQL enum |       No | Defaults to `open`          |
+| `meeting_link`     | `text`          |       No | Private meeting URL         |
+| `image_key`        | `text`          |      Yes | Optional object-storage key |
+| `description`      | `text`          |       No | Session details             |
+| `created_at`       | `timestamptz`   |       No | Creation timestamp          |
+| `updated_at`       | `timestamptz`   |       No | Last update timestamp       |
 
-Changes from the current implementation:
-
-- Rename `organizer_id` to `owner_id`.
-- Remove `capacity`; sessions are always one-to-one.
-- Add `duration_minutes`.
-- Add lifecycle `status`.
-- Add a foreign key from `owner_id` to `profiles.id`.
-
-Recommended relationships:
+Relationship:
 
 ```text
 sessions.owner_id → profiles.id
 ```
 
-Choose the `ON DELETE` behavior deliberately. For the MVP, `RESTRICT` is safer
-than silently deleting historical sessions when a profile is removed. User
-deletion should go through an application/admin workflow that first handles
-owned records.
+The relationship uses `ON DELETE RESTRICT` so deleting a profile cannot
+silently delete historical sessions. User deletion requires an explicit
+application or administrative workflow that first handles owned records.
 
 ## Session request status
 
@@ -161,16 +163,16 @@ cancelled
 
 Each row records one user's request and its decision history.
 
-| Column | Type | Nullable | Description |
-| --- | --- | ---: | --- |
-| `id` | `uuid` | No | Primary key |
-| `session_id` | `uuid` | No | FK to `sessions.id` |
-| `requester_id` | `uuid` | No | FK to `profiles.id` |
-| `status` | enum/text | No | Defaults to `pending` |
-| `message` | `text` | Yes | Optional request note |
-| `created_at` | `timestamptz` | No | Request creation time |
-| `responded_at` | `timestamptz` | Yes | Owner decision time |
-| `updated_at` | `timestamptz` | No | Last state change |
+| Column         | Type            | Nullable | Description           |
+| -------------- | --------------- | -------: | --------------------- |
+| `id`           | `uuid`          |       No | Primary key           |
+| `session_id`   | `uuid`          |       No | FK to `sessions.id`   |
+| `requester_id` | `uuid`          |       No | FK to `profiles.id`   |
+| `status`       | PostgreSQL enum |       No | Defaults to `pending` |
+| `message`      | `text`          |      Yes | Optional request note |
+| `created_at`   | `timestamptz`   |       No | Request creation time |
+| `responded_at` | `timestamptz`   |      Yes | Owner decision time   |
+| `updated_at`   | `timestamptz`   |       No | Last state change     |
 
 Relationships:
 
@@ -179,8 +181,8 @@ session_requests.session_id → sessions.id ON DELETE CASCADE
 session_requests.requester_id → profiles.id
 ```
 
-Use `RESTRICT` for requester profile deletion until an explicit account-deletion
-and anonymization policy is designed.
+The requester relationship uses `ON DELETE RESTRICT` until an explicit
+account-deletion and anonymization workflow is implemented.
 
 ## Relationships
 
@@ -212,12 +214,13 @@ profiles.id PRIMARY KEY
 profiles.id FOREIGN KEY → auth.users.id ON DELETE CASCADE
 
 sessions.id PRIMARY KEY
-sessions.owner_id FOREIGN KEY → profiles.id
-sessions.duration_minutes > 0
+sessions.owner_id FOREIGN KEY → profiles.id ON DELETE RESTRICT
+sessions.duration_minutes BETWEEN 15 AND 120
+active sessions UNIQUE by owner_id and starts_at
 
 session_requests.id PRIMARY KEY
 session_requests.session_id FOREIGN KEY → sessions.id ON DELETE CASCADE
-session_requests.requester_id FOREIGN KEY → profiles.id
+session_requests.requester_id FOREIGN KEY → profiles.id ON DELETE RESTRICT
 ```
 
 ### Exactly one approved requester
@@ -248,6 +251,18 @@ becomes open again.
 The rule that an owner cannot request their own session depends on another
 table's value and belongs in the transactional service logic.
 
+### Duplicate active session start times
+
+Prevent an owner from having two active sessions at the same start time:
+
+```sql
+CREATE UNIQUE INDEX sessions_owner_active_start_unique_idx
+ON sessions (owner_id, starts_at)
+WHERE status IN ('open', 'booked');
+```
+
+Cancelled and completed sessions do not block a new session at the same time.
+
 ## Indexes
 
 ### Browse open sessions
@@ -262,10 +277,10 @@ WHERE status = 'open'
 ORDER BY starts_at ASC, id ASC;
 ```
 
-Index:
+Partial index:
 
 ```text
-sessions(status, starts_at, id)
+sessions(starts_at, id) WHERE status = open
 ```
 
 ### Sessions owned by one user
@@ -274,16 +289,24 @@ sessions(status, starts_at, id)
 sessions(owner_id, starts_at, id)
 ```
 
+### Booked sessions
+
+```text
+sessions(starts_at, id) WHERE status = booked
+```
+
 ### Requests for a session
 
 ```text
-session_requests(session_id, status, created_at)
+session_requests(session_id, status)
+session_requests(session_id, created_at, id)
 ```
 
 ### Requests made by one user
 
 ```text
-session_requests(requester_id, created_at)
+session_requests(requester_id, status, created_at)
+session_requests(requester_id, created_at, id)
 ```
 
 ## Approval transaction
@@ -379,8 +402,8 @@ profile-images/<userId>/<uuid>.<extension>
 session-images/<userId>/<uuid>.<extension>
 ```
 
-Object cleanup is an application workflow and is not performed automatically by
-PostgreSQL foreign keys.
+Object cleanup requires a separate application workflow and is not performed
+automatically by PostgreSQL foreign keys.
 
 ## Migration workflow
 
@@ -436,25 +459,6 @@ depend on Express request or response objects.
 Services own state-transition rules and authorization decisions. Sensitive
 mutations should also constrain SQL by the authenticated user ID where
 practical.
-
-## Current implementation gap
-
-The current code and initial migration still model group sessions with:
-
-```text
-organizer_id
-capacity
-no profile foreign key
-no session status
-```
-
-The next schema work must migrate that implementation toward this document:
-
-1. Add `profiles` and the Auth provisioning trigger.
-2. Replace session capacity with duration and status.
-3. Rename organizer ownership consistently if `owner_id` is adopted.
-4. Add `session_requests`, indexes, and constraints.
-5. Implement transactional request approval and cancellation.
 
 ## Final design summary
 

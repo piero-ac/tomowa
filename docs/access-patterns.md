@@ -20,22 +20,24 @@ There is no `session_attendees` table in the MVP. The approved
 
 ## Access-pattern summary
 
-| Endpoint | Access pattern |
-| --- | --- |
-| `POST /sessions` | Create an open session owned by current user |
-| `GET /sessions` | List upcoming open sessions |
-| `GET /sessions/:sessionId` | Get one session with viewer-aware fields |
-| `PATCH /sessions/:sessionId` | Update an owned open session |
-| `DELETE /sessions/:sessionId` | Delete or cancel an owned session |
-| `POST /sessions/:sessionId/requests` | Request an open session |
-| `POST /sessions/:sessionId/requests/:requestId/approve` | Approve one request atomically |
-| `POST /sessions/:sessionId/requests/:requestId/decline` | Decline one pending request |
-| `POST /sessions/:sessionId/requests/:requestId/cancel` | Cancel a request or booking |
-| `GET /me/profile` | Get current user's profile |
-| `PATCH /me/profile` | Update current user's profile |
-| `GET /me/sessions-created` | List sessions owned by current user |
-| `GET /me/session-requests` | List requests made by current user |
-| `GET /me/sessions-booked` | List confirmed sessions for current user |
+| Endpoint                                                | Access pattern                               |
+| ------------------------------------------------------- | -------------------------------------------- |
+| `GET /health`                                           | Return the public API health status          |
+| `POST /sessions`                                        | Create an open session owned by current user |
+| `GET /sessions`                                         | List upcoming open sessions                  |
+| `GET /sessions/:sessionId`                              | Get one session with viewer-aware fields     |
+| `PATCH /sessions/:sessionId`                            | Update an owned active session               |
+| `DELETE /sessions/:sessionId`                           | Delete or cancel an owned session            |
+| `GET /sessions/:sessionId/requests`                     | List requests for an owned session           |
+| `POST /sessions/:sessionId/requests`                    | Request an open session                      |
+| `POST /sessions/:sessionId/requests/:requestId/approve` | Approve one request atomically               |
+| `POST /sessions/:sessionId/requests/:requestId/decline` | Decline one pending request                  |
+| `POST /sessions/:sessionId/requests/:requestId/cancel`  | Cancel a request or booking                  |
+| `GET /me/profile`                                       | Get current user's profile                   |
+| `PATCH /me/profile`                                     | Update current user's profile                |
+| `GET /me/sessions-created`                              | List sessions owned by current user          |
+| `GET /me/session-requests`                              | List requests made by current user           |
+| `GET /me/sessions-booked`                               | List confirmed sessions for current user     |
 
 ## 1. Provision profile after signup
 
@@ -152,6 +154,7 @@ Rules:
 - Caller must be the owner.
 - Repository update is constrained by both `id` and `owner_id`.
 - A booked session's `starts_at` cannot be changed.
+- Cancelled and completed sessions cannot be changed.
 - Status transitions do not use this generic update path.
 
 ## 6. Delete or cancel session
@@ -159,15 +162,32 @@ Rules:
 Rules:
 
 - Caller must be the owner.
-- An open session with no request history may be hard-deleted.
-- A session with request history should become `cancelled` instead of being
-  deleted.
+- Session must not have started.
+- An open session with no request history is hard-deleted.
+- A session with request history becomes `cancelled` instead of being deleted.
 - Cancelling a session cancels pending or approved requests in the same
   transaction.
 
 Retaining session and request rows preserves meaningful history.
 
-## 7. Request a session
+## 7. List requests for a session
+
+Reads:
+
+```text
+session
+session_requests
+requester profiles
+```
+
+Rules:
+
+- Caller must be the session owner.
+- Results include a public profile summary for each requester.
+- Results are ordered by `created_at DESC, id DESC`.
+- Cursor pagination uses `(created_at, id)`.
+
+## 8. Request a session
 
 Reads:
 
@@ -190,7 +210,7 @@ Rules:
 - Several different users may have pending requests for the same session.
 - The database uniqueness rule is the final duplicate-request guard.
 
-## 8. Approve request
+## 9. Approve request
 
 This operation must execute in a PostgreSQL transaction.
 
@@ -220,7 +240,7 @@ COMMIT
 The database must enforce at most one approved request per session. A
 concurrent uniqueness failure becomes `409 Conflict`.
 
-## 9. Decline request
+## 10. Decline request
 
 Rules:
 
@@ -229,7 +249,7 @@ Rules:
 - Change status to `declined` and set `responded_at`.
 - Session remains `open`.
 
-## 10. Cancel pending request
+## 11. Cancel pending request
 
 Rules:
 
@@ -238,7 +258,7 @@ Rules:
 - Change status to `cancelled`.
 - Retain the row for history.
 
-## 11. Cancel approved booking
+## 12. Cancel approved booking
 
 This operation is transactional.
 
@@ -253,7 +273,7 @@ Rules:
 - Requests declined during the original approval remain declined. New requests
   may be submitted after the session reopens.
 
-## 12. Get or update my profile
+## 13. Get or update my profile
 
 Filtering:
 
@@ -265,9 +285,9 @@ Rules:
 
 - Users may edit only the approved profile fields.
 - IDs and timestamps are server-controlled.
-- Username uniqueness is enforced by the database if usernames are enabled.
+- Username uniqueness is enforced by the database.
 
-## 13. List sessions I created
+## 14. List sessions I created
 
 Filtering:
 
@@ -278,12 +298,13 @@ sessions.owner_id = authenticated user ID
 Ordering:
 
 ```text
-starts_at ASC, id ASC
+starts_at DESC, id DESC
 ```
 
-The owner view may include request counts and pending request summaries.
+Each item includes counts for pending, approved, declined, cancelled, and total
+requests. The owner view includes the private meeting link.
 
-## 14. List requests I made
+## 15. List requests I made
 
 Reads:
 
@@ -299,7 +320,11 @@ Filtering:
 session_requests.requester_id = authenticated user ID
 ```
 
-## 15. List booked sessions
+Results include session and owner profile details and are ordered by
+`created_at DESC, id DESC` using cursor pagination. Meeting-link privacy still
+applies to the nested session data.
+
+## 16. List booked sessions
 
 Return sessions where the current user is either:
 
@@ -314,21 +339,30 @@ session_requests.requester_id = authenticated user ID
 AND session_requests.status = approved
 ```
 
-This response may include the meeting link.
+This response includes the meeting link because every returned item belongs to
+the session owner or approved requester.
+
+Ordering:
+
+```text
+starts_at ASC, id ASC
+```
 
 ## Required indexes and constraints
 
 ### Profiles
 
 - Primary key on `id`.
-- Optional unique index on normalized username.
+- Unique constraint on `username` when it is non-null.
 
 ### Sessions
 
 - Primary key on `id`.
-- Index on `(status, starts_at, id)` for browsing open sessions.
+- Partial index on `(starts_at, id)` for browsing open sessions.
 - Index on `(owner_id, starts_at, id)` for owner listings.
-- Check constraint requiring a positive duration.
+- Partial index on `(starts_at, id)` for booked-session listings.
+- Partial unique index on `(owner_id, starts_at)` for active sessions.
+- Check constraint requiring a duration from 15 through 120 minutes.
 
 ### Session requests
 
@@ -336,7 +370,9 @@ This response may include the meeting link.
 - Foreign key on `session_id`.
 - Foreign key on `requester_id`.
 - Index on `(session_id, status)` for owner request queues.
-- Index on `(requester_id, created_at)` for requester history.
+- Index on `(requester_id, status, created_at)` for status-filtered history.
+- Index on `(session_id, created_at, id)` for session request pagination.
+- Index on `(requester_id, created_at, id)` for requester history pagination.
 - Partial unique index allowing at most one approved request per session.
 - Uniqueness rule preventing duplicate active requests by the same requester.
 
@@ -365,7 +401,7 @@ Not included:
 - Automatic matching or recommendations
 - Enforcement of overlapping availability across sessions
 
-## Final MVP requirements
+## Implemented MVP behavior
 
 ```text
 Create a profile automatically after signup
