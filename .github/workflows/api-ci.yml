@@ -52,3 +52,82 @@ jobs:
 
       - name: Run unit tests
         run: npm run test:unit --workspace=@tomowa/api
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: quality
+    env:
+      NODE_ENV: test
+      LOCAL_SEED_PASSWORD: tomowa-ci-only-password
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.113.0
+
+      - name: Start local Supabase
+        working-directory: apps/api
+        run: supabase start
+
+      - name: Configure local test environment
+        working-directory: apps/api
+        run: |
+          database_url=""
+          supabase_url=""
+          publishable_key=""
+          anon_key=""
+          secret_key=""
+          service_role_key=""
+
+          while IFS= read -r line; do
+            key="${line%%=*}"
+            value="${line#*=}"
+            value="${value#\"}"
+            value="${value%\"}"
+
+            case "$key" in
+              DB_URL) database_url="$value" ;;
+              API_URL) supabase_url="$value" ;;
+              PUBLISHABLE_KEY) publishable_key="$value" ;;
+              ANON_KEY) anon_key="$value" ;;
+              SECRET_KEY) secret_key="$value" ;;
+              SERVICE_ROLE_KEY) service_role_key="$value" ;;
+            esac
+          done < <(supabase status -o env)
+
+          publishable_key="${publishable_key:-$anon_key}"
+          secret_key="${secret_key:-$service_role_key}"
+
+          if [[ -z "$database_url" || -z "$supabase_url" || -z "$publishable_key" || -z "$secret_key" ]]; then
+            echo "Supabase did not return all required local credentials."
+            exit 1
+          fi
+
+          {
+            printf 'DATABASE_URL=%s\n' "$database_url"
+            printf 'SUPABASE_URL=%s\n' "$supabase_url"
+            printf 'SUPABASE_PUBLISHABLE_KEY=%s\n' "$publishable_key"
+            printf 'SUPABASE_LOCAL_SECRET_KEY=%s\n' "$secret_key"
+          } >> "$GITHUB_ENV"
+
+      - name: Apply database migrations
+        run: npm run db:migrate --workspace=@tomowa/api
+
+      - name: Run integration tests
+        run: npm run test:integration --workspace=@tomowa/api
