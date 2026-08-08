@@ -407,7 +407,7 @@ automatically by PostgreSQL foreign keys.
 
 ## Migration workflow
 
-Run commands from `apps/api`:
+Run commands from the repository root:
 
 ```text
 Edit src/db/schema.ts

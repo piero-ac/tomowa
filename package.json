@@ -1,9 +1,70 @@
 {
-	"name": "tomowa",
+	"name": "@tomowa/api",
 	"private": true,
-	"workspaces": [
-		"apps/*",
-		"infrastructure/*",
-		"packages/*"
-	]
+	"version": "1.0.0",
+	"description": "Backend API for scheduling one-to-one language-exchange sessions.",
+	"main": "dist/server.js",
+	"scripts": {
+		"dev": "tsx watch src/server.ts",
+		"build": "tsc",
+		"start": "node dist/server.js",
+		"db:generate": "drizzle-kit generate",
+		"db:migrate": "drizzle-kit migrate",
+		"db:studio": "drizzle-kit studio",
+		"db:seed": "tsx src/scripts/seed-local.ts",
+		"supabase:start": "supabase start",
+		"supabase:stop": "supabase stop",
+		"supabase:status": "supabase status",
+		"lint": "eslint src tests drizzle.config.ts vitest.config.ts",
+		"lint:fix": "eslint src tests drizzle.config.ts vitest.config.ts --fix",
+		"format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"drizzle.config.ts\" \"vitest.config.ts\" \"openapi.yaml\" \".redocly.lint-ignore.yaml\" \"package.json\"",
+		"format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"drizzle.config.ts\" \"vitest.config.ts\" \"openapi.yaml\" \".redocly.lint-ignore.yaml\" \"package.json\"",
+		"test": "npm run test:typecheck && npm run test:unit && npm run test:integration",
+		"test:unit": "vitest run --project unit",
+		"test:unit:watch": "vitest --project unit",
+		"test:typecheck": "tsc --noEmit -p tests/tsconfig.json",
+		"test:integration": "npm run db:seed && vitest run --project integration",
+		"test:coverage": "npm run db:seed && vitest run --coverage",
+		"openapi:lint": "redocly lint openapi.yaml"
+	},
+	"keywords": [
+		"express",
+		"typescript",
+		"postgresql",
+		"supabase",
+		"drizzle-orm"
+	],
+	"license": "ISC",
+	"type": "module",
+	"devDependencies": {
+		"@eslint/js": "^9.39.4",
+		"@redocly/cli": "^2.43.3",
+		"@types/cors": "^2.8.19",
+		"@types/express": "^5.0.6",
+		"@types/node": "^20.19.43",
+		"@types/supertest": "^7.2.1",
+		"@types/swagger-ui-express": "^4.1.8",
+		"@vitest/coverage-v8": "^4.1.10",
+		"drizzle-kit": "^1.0.0-rc.4",
+		"eslint": "^9.39.4",
+		"eslint-config-prettier": "^10.1.8",
+		"prettier": "3.9.6",
+		"supertest": "^7.2.2",
+		"tsx": "^4.23.0",
+		"typescript": "^5.9.3",
+		"typescript-eslint": "^8.65.0",
+		"vitest": "^4.1.10"
+	},
+	"dependencies": {
+		"@supabase/supabase-js": "^2.110.7",
+		"cors": "^2.8.6",
+		"dotenv": "^17.4.2",
+		"drizzle-orm": "^1.0.0-rc.4",
+		"express": "^5.2.1",
+		"helmet": "^8.2.0",
+		"postgres": "^3.4.9",
+		"swagger-ui-express": "^5.0.1",
+		"yaml": "^2.9.0",
+		"zod": "^4.4.3"
+	}
 }
