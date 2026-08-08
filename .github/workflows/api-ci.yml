@@ -36,22 +36,22 @@ jobs:
         run: npm ci
 
       - name: Check formatting
-        run: npm run format:check --workspace=@tomowa/api
+        run: npm run format:check
 
       - name: Validate OpenAPI
-        run: npm run openapi:lint --workspace=@tomowa/api
+        run: npm run openapi:lint
 
       - name: Lint
-        run: npm run lint --workspace=@tomowa/api
+        run: npm run lint
 
       - name: Build
-        run: npm run build --workspace=@tomowa/api
+        run: npm run build
 
       - name: Type-check tests
-        run: npm run test:typecheck --workspace=@tomowa/api
+        run: npm run test:typecheck
 
       - name: Run unit tests
-        run: npm run test:unit --workspace=@tomowa/api
+        run: npm run test:unit
 
   integration:
     name: Integration tests
@@ -82,11 +82,9 @@ jobs:
           version: 2.113.0
 
       - name: Start local Supabase
-        working-directory: apps/api
         run: supabase start
 
       - name: Configure local test environment
-        working-directory: apps/api
         run: |
           database_url=""
           supabase_url=""
@@ -127,7 +125,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Apply database migrations
-        run: npm run db:migrate --workspace=@tomowa/api
+        run: npm run db:migrate
 
       - name: Run integration tests
-        run: npm run test:integration --workspace=@tomowa/api
+        run: npm run test:integration

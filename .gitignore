@@ -1,10 +1,6 @@
 # Dependencies
 node_modules/
 
-# Next.js
-.next/
-out/
-
 # Logs
 *.log
 
@@ -22,13 +18,10 @@ dist/
 # VS Code
 .vscode/
 
-# CDK
-cdk.out/
-
 # Supabase local state
-**/supabase/.temp/
-**/supabase/.branches/
-**/supabase/snippets/
+supabase/.temp/
+supabase/.branches/
+supabase/snippets/
 
-# Test Coverage
-**/coverage/
+# Test coverage
+coverage/

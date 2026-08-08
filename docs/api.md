@@ -154,8 +154,8 @@ pending ─────> approved
 ## Endpoints
 
 The endpoint summary below describes the implemented MVP API. The OpenAPI
-document at `apps/api/openapi.yaml` is the authoritative machine-readable
-contract and is available through Swagger UI at `/docs/` when the API runs.
+document at `openapi.yaml` is the authoritative machine-readable contract and
+is available through Swagger UI at `/docs/` when the API runs.
 
 ### `GET /health`
 

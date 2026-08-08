@@ -73,8 +73,7 @@ Most API endpoints require a Supabase access token:
 Authorization: Bearer <access_token>
 ```
 
-See [`apps/api/openapi.yaml`](apps/api/openapi.yaml) for the complete API
-contract.
+See [`openapi.yaml`](openapi.yaml) for the complete API contract.
 
 ## Local development
 
@@ -95,35 +94,35 @@ npm install
 Create the API environment file:
 
 ```bash
-cp apps/api/.env.example apps/api/.env
+cp .env.example .env
 ```
 
-Start Supabase from the API workspace:
+Start Supabase from the repository root:
 
 ```bash
-npm run supabase:start --workspace=@tomowa/api
-npm run supabase:status --workspace=@tomowa/api
+npm run supabase:start
+npm run supabase:status
 ```
 
-Use the local Supabase status output to configure `apps/api/.env`. Set
+Use the local Supabase status output to configure `.env`. Set
 `LOCAL_SEED_PASSWORD` to a password used only for the local seeded accounts.
 
 Apply the migrations:
 
 ```bash
-npm run db:migrate --workspace=@tomowa/api
+npm run db:migrate
 ```
 
 Seed the local database:
 
 ```bash
-npm run db:seed --workspace=@tomowa/api
+npm run db:seed
 ```
 
 Start the API:
 
 ```bash
-npm run dev --workspace=@tomowa/api
+npm run dev
 ```
 
 The API runs at `http://localhost:3001`.
@@ -136,25 +135,25 @@ running.
 Run the complete test suite:
 
 ```bash
-npm test --workspace=@tomowa/api
+npm test
 ```
 
 Run individual test groups:
 
 ```bash
-npm run test:unit --workspace=@tomowa/api
-npm run test:integration --workspace=@tomowa/api
-npm run test:coverage --workspace=@tomowa/api
+npm run test:unit
+npm run test:integration
+npm run test:coverage
 ```
 
 Run the API quality checks:
 
 ```bash
-npm run format:check --workspace=@tomowa/api
-npm run openapi:lint --workspace=@tomowa/api
-npm run lint --workspace=@tomowa/api
-npm run build --workspace=@tomowa/api
-npm run test:typecheck --workspace=@tomowa/api
+npm run format:check
+npm run openapi:lint
+npm run lint
+npm run build
+npm run test:typecheck
 ```
 
 ## Database migrations
@@ -164,8 +163,8 @@ Drizzle is the source of truth for application schema changes.
 Generate and apply migrations with:
 
 ```bash
-npm run db:generate --workspace=@tomowa/api
-npm run db:migrate --workspace=@tomowa/api
+npm run db:generate
+npm run db:migrate
 ```
 
 Never run `supabase db reset --linked` against a hosted project. It can delete
