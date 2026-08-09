@@ -1,11 +1,14 @@
 import "dotenv/config";
 import { z } from "zod";
 
+import { corsAllowedOriginsSchema } from "./cors.js";
+
 const envSchema = z.object({
 	NODE_ENV: z
 		.enum(["development", "test", "production"])
 		.default("development"),
 	PORT: z.coerce.number().int().min(1).max(65535).default(3001),
+	CORS_ALLOWED_ORIGINS: corsAllowedOriginsSchema,
 	DATABASE_URL: z.url(),
 	SUPABASE_URL: z.url(),
 	SUPABASE_PUBLISHABLE_KEY: z

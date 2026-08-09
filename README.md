@@ -106,6 +106,12 @@ npm run supabase:status
 
 Use the local Supabase status output to configure `.env`. Set
 `LOCAL_SEED_PASSWORD` to a password used only for the local seeded accounts.
+Set `CORS_ALLOWED_ORIGINS` to a comma-separated list of browser origins that
+may call the API, such as
+`http://localhost:3000,http://127.0.0.1:3000`. Origins must contain only the
+scheme, host, and optional port, with no path or trailing slash. An empty list
+disables cross-origin browser access while still allowing same-origin and
+non-browser requests.
 
 Apply the migrations:
 

@@ -2,6 +2,8 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 
+import { createCorsOptions } from "./config/cors.js";
+import { env } from "./config/env.js";
 import apiRouter from "./routes/index.js";
 import healthRouter from "./routes/health.routes.js";
 import docsRouter, { getOpenApiDocument } from "./routes/docs.routes.js";
@@ -19,7 +21,7 @@ app.use(
 	docsRouter,
 );
 app.use(helmet());
-app.use(cors());
+app.use(cors(createCorsOptions(env.CORS_ALLOWED_ORIGINS)));
 app.use(express.json({ limit: "100kb" }));
 
 app.get("/openapi.json", getOpenApiDocument);
