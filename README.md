@@ -113,6 +113,12 @@ scheme, host, and optional port, with no path or trailing slash. An empty list
 disables cross-origin browser access while still allowing same-origin and
 non-browser requests.
 
+API rate limiting defaults to 300 requests per IP address every 60 seconds.
+Configure the window with `RATE_LIMIT_WINDOW_MS` and the request count with
+`RATE_LIMIT_MAX_REQUESTS`. `TRUST_PROXY_HOPS` defaults to `0` for direct local
+connections and must match the hosting platform's reverse-proxy path in
+production so the limiter identifies client IP addresses correctly.
+
 Apply the migrations:
 
 ```bash
