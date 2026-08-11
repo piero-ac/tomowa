@@ -17,6 +17,8 @@ servers:
 tags:
   - name: Health
     description: API health checks
+  - name: Demo Access
+    description: Temporary access tokens for the hosted demo accounts
   - name: Sessions
     description: Language practice sessions
   - name: Session Requests
@@ -43,6 +45,45 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+
+  /api/demo/login:
+    post:
+      tags:
+        - Demo Access
+      summary: Sign in as a demo user
+      description: >
+        Returns a short-lived Supabase access token for one of the fixed demo
+        roles. No password is accepted from or returned to the client. Copy the
+        accessToken value, select Authorize in Swagger UI, and paste the token
+        into the bearerAuth field. This endpoint is unavailable when demo
+        access is disabled.
+      operationId: loginDemoUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DemoLoginBody"
+      responses:
+        "200":
+          description: A short-lived access token for the selected demo role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DemoLoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 
   /api/sessions:
     get:
@@ -538,6 +579,42 @@ components:
       examples:
         - status: ok
           service: tomowa-api
+
+    DemoRole:
+      type: string
+      enum:
+        - owner
+        - requester
+        - other
+
+    DemoLoginBody:
+      type: object
+      additionalProperties: false
+      required:
+        - role
+      properties:
+        role:
+          $ref: "#/components/schemas/DemoRole"
+      examples:
+        - role: owner
+
+    DemoLoginResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - role
+        - accessToken
+        - expiresAt
+      properties:
+        role:
+          $ref: "#/components/schemas/DemoRole"
+        accessToken:
+          type: string
+          description: Short-lived Supabase JWT for the selected demo user.
+        expiresAt:
+          type: integer
+          format: int64
+          description: Token expiration time as Unix epoch seconds.
 
     ErrorResponse:
       type: object
@@ -1222,6 +1299,15 @@ components:
           example:
             message: Request body is too large.
 
+    TooManyRequests:
+      description: The client has exceeded the request limit
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            message: Too many demo login attempts. Please try again later.
+
     InternalServerError:
       description: An unexpected server error occurred
       content:
@@ -1230,3 +1316,12 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
           example:
             message: Internal server error.
+
+    ServiceUnavailable:
+      description: Demo authentication is temporarily unavailable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            message: Demo login is temporarily unavailable.

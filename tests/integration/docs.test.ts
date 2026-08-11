@@ -14,7 +14,9 @@ describe("API documentation", () => {
 			security: [{ bearerAuth: [] }],
 		});
 		expect(response.body.paths).toHaveProperty("/health");
+		expect(response.body.paths).toHaveProperty("/api/demo/login");
 		expect(response.body.paths).toHaveProperty("/api/sessions");
+		expect(response.body.paths["/api/demo/login"].post.security).toEqual([]);
 		expect(response.body.components.securitySchemes.bearerAuth).toMatchObject({
 			type: "http",
 			scheme: "bearer",

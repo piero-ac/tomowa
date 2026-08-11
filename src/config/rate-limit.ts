@@ -17,3 +17,16 @@ export function createApiRateLimiter(options: ApiRateLimiterOptions) {
 		},
 	});
 }
+
+export function createDemoLoginRateLimiter() {
+	return rateLimit({
+		windowMs: 15 * 60_000,
+		limit: 10,
+		identifier: "demo-login",
+		standardHeaders: "draft-8",
+		legacyHeaders: false,
+		message: {
+			message: "Too many demo login attempts. Please try again later.",
+		},
+	});
+}

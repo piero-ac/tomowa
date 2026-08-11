@@ -2,7 +2,10 @@ import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
-import { createApiRateLimiter } from "../../../src/config/rate-limit.js";
+import {
+	createApiRateLimiter,
+	createDemoLoginRateLimiter,
+} from "../../../src/config/rate-limit.js";
 
 function createTestApp() {
 	const app = express();
@@ -51,5 +54,28 @@ describe("API rate limiter", () => {
 		expect(response.status).toBe(200);
 		expect(response.headers.ratelimit).toBeUndefined();
 		expect(response.headers["ratelimit-policy"]).toBeUndefined();
+	});
+});
+
+describe("demo login rate limiter", () => {
+	it("returns 429 after ten login attempts from one client", async () => {
+		const app = express();
+
+		app.post("/api/demo/login", createDemoLoginRateLimiter(), (req, res) => {
+			res.status(200).json({ status: "ok" });
+		});
+
+		for (let attempt = 0; attempt < 10; attempt += 1) {
+			const response = await request(app).post("/api/demo/login");
+
+			expect(response.status).toBe(200);
+		}
+
+		const blockedResponse = await request(app).post("/api/demo/login");
+
+		expect(blockedResponse.status).toBe(429);
+		expect(blockedResponse.body).toEqual({
+			message: "Too many demo login attempts. Please try again later.",
+		});
 	});
 });
