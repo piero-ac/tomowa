@@ -19,6 +19,8 @@ and maintainable API design.
 - PostgreSQL constraints and partial unique indexes
 - Unit and integration tests
 - OpenAPI 3.1 documentation and Swagger UI
+- Password-free demo access with three seeded personas
+- Guarded, repeatable demo-data reset tooling
 - Local Supabase development environment
 
 ## Architecture
@@ -61,7 +63,13 @@ business rules, authorization, and application database access.
 
 ## API documentation
 
-With the API running locally:
+Hosted demo:
+
+- Swagger UI: <https://tomowa.onrender.com/docs/>
+- OpenAPI document: <https://tomowa.onrender.com/openapi.json>
+- Health check: <https://tomowa.onrender.com/health>
+
+Local development:
 
 - Swagger UI: `http://localhost:3001/docs/`
 - OpenAPI document: `http://localhost:3001/openapi.json`
@@ -74,6 +82,17 @@ Authorization: Bearer <access_token>
 ```
 
 See [`openapi.yaml`](openapi.yaml) for the complete API contract.
+
+## Hosted demo
+
+Reviewers can use `POST /api/demo/login` to sign in as one of three seeded
+personas without knowing or submitting a password. The endpoint returns a
+normal short-lived Supabase access token, which can be entered into Swagger's
+**Authorize** dialog.
+
+See the [hosted demo guide](docs/demo-guide.md) for the available personas and
+suggested API workflows. The personas are starting states, not permission
+roles; all three accounts use the same application authorization rules.
 
 ## Local development
 
@@ -150,6 +169,13 @@ Run the complete test suite:
 npm test
 ```
 
+Run the complete test suite and leave local Supabase populated with the demo
+showcase afterward:
+
+```bash
+npm run test:demo-ready
+```
+
 Run individual test groups:
 
 ```bash
@@ -182,9 +208,40 @@ npm run db:migrate
 Never run `supabase db reset --linked` against a hosted project. It can delete
 the remote project data.
 
+## Demo data reset
+
+The reset command rebuilds only the sessions, requests, and profiles belonging
+to the three configured demo users. It reads their existing Supabase Auth IDs
+but does not create, delete, or change Auth users or passwords. It also refuses
+to run if demo data is connected to a non-demo user.
+
+Reset a local Supabase instance with:
+
+```bash
+npm run demo:reset:local
+```
+
+`npm test` reseeds the database with the integration-test baseline. Use
+`npm run test:demo-ready` when you want to run every test and automatically
+restore the richer demo baseline afterward.
+
+For the hosted database, run the interactive wrapper:
+
+```bash
+npm run demo:reset:hosted
+```
+
+The wrapper asks for confirmation and invisibly reads the hosted connection
+string, so the credential is not stored in the repository or shell history.
+The target must match the connection hostname. Run the hosted reset manually
+when the shared demo needs a clean baseline; it is not part of application
+startup or deployment.
+
 ## Additional documentation
 
 - [`docs/api.md`](docs/api.md) — API behavior and lifecycle rules
+- [`docs/demo-guide.md`](docs/demo-guide.md) — reviewer walkthrough for the
+  hosted demo
 - [`docs/access-patterns.md`](docs/access-patterns.md) — authorization and
   transaction boundaries
 - [`docs/postgres-design.md`](docs/postgres-design.md) — database design and
@@ -192,6 +249,7 @@ the remote project data.
 
 ## Project status
 
-The core backend feature set, automated tests, OpenAPI contract, and Swagger UI
-are complete. Continuous integration, production hardening, demo safeguards,
-and deployment remain in progress.
+The backend is deployed with continuous integration, production-aware CORS and
+rate limiting, guarded demo access, automated tests, an OpenAPI contract, and
+Swagger UI. Future work is optional maintenance, observability, and incremental
+hardening rather than required feature development.

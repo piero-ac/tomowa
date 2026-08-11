@@ -1,12 +1,12 @@
 import "dotenv/config";
 
 import { createClient } from "@supabase/supabase-js";
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { z } from "zod";
 
-import { sessions } from "../db/schema.js";
+import { profiles, sessions } from "../db/schema.js";
 
 const seedEnvSchema = z.object({
 	DATABASE_URL: z.url(),
@@ -135,6 +135,38 @@ async function seed() {
 
 	if (!ownerId || seededUserIds.length !== seedUsers.length) {
 		throw new Error("Seed users were not created.");
+	}
+
+	await db
+		.update(profiles)
+		.set({ username: null })
+		.where(inArray(profiles.id, seededUserIds));
+
+	for (const seedUser of seedUsers) {
+		const userId = userIds.get(seedUser.email);
+
+		if (!userId) {
+			throw new Error(`Seed user ID is missing for ${seedUser.email}.`);
+		}
+
+		const updatedProfiles = await db
+			.update(profiles)
+			.set({
+				displayName: seedUser.displayName,
+				username: null,
+				bio: null,
+				avatarKey: null,
+				nativeLanguage: null,
+				learningLanguage: null,
+				timezone: null,
+				updatedAt: new Date(),
+			})
+			.where(eq(profiles.id, userId))
+			.returning({ id: profiles.id });
+
+		if (updatedProfiles.length !== 1) {
+			throw new Error(`Seed profile is missing for ${seedUser.email}.`);
+		}
 	}
 
 	await db.delete(sessions).where(inArray(sessions.ownerId, seededUserIds));
