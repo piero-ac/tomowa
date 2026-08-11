@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { envSchema } from "../../../src/config/env.js";
+import { envSchema } from "../../../src/config/env.schema.js";
 
 const requiredEnvironment = {
 	DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
